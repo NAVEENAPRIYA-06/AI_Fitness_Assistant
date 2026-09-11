@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import bcrypt from 'bcryptjs';
 import {
   UserProfile,
   DailyContext,
@@ -22,1026 +25,405 @@ import {
   AdaptivePlanPayload
 } from '../../src/types/index.js';
 import { adaptivePlanEngine } from '../engine/adaptivePlanEngine.js';
+import { connectMongoDB, isMongoDBConnected } from './mongoConnect.js';
+import { getMongoModels } from './models.js';
+
+export interface UserAccount {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name: string;
+  role: 'research_participant' | 'user' | 'admin';
+  timezone: string;
+  onboardingComplete: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PersistedStoreData {
+  users: Record<string, UserAccount>;
+  userProfiles: Record<string, UserProfile>;
+  dailyContextHistories: Record<string, DailyContext[]>;
+  evolvingStates: Record<string, EvolvingUserState>;
+  goals: Record<string, GoalStrategyItem[]>;
+  outcomes: Record<string, RecommendationOutcome[]>;
+  adaptivePlans: Record<string, AdaptivePlanPayload>;
+  recommendationHistories: Record<string, RecommendationHistoryItem[]>;
+  predictionRecords: Record<string, AdherencePredictionRecord[]>;
+  whatIfScenarios: Record<string, WhatIfScenarioRecord[]>;
+  activeMLModelMetadata: MLModelMetadata | null;
+}
 
 /**
- * HealthPilot AI In-Memory Database Repository
+ * HealthPilot AI Persistent Multi-User Database Repository
  * Features:
- * - Research Baseline Seed Data for cold-start demo execution
- * - Dynamic mutation state that preserves session updates
- * - Dynamic physiological index recalculation (Recovery Score, Cognitive Load, Adaptation Status)
- * - Continuous empirical feedback loop (outcomes update behavioral momentum & adherence rates)
+ * - Real multi-user data isolation (each user has their own profile, context, goals, outcomes, plan, history)
+ * - Persistent disk document store in .data/healthpilot_db.json surviving server restarts and page reloads
+ * - Seamless Mongoose / MongoDB integration when MONGODB_URI is provided
+ * - Real password hashing with bcryptjs and JWT session integration
+ * - Preserves all research algorithms (Recovery Score calculation, Multi-Dimensional Evolving State,
+ *   Behavioral Analysis, Adaptive Plan engine, Feedback Loop, and Evaluation Benchmark)
  */
-class InMemoryHealthPilotDB {
-  // RESEARCH BASELINE SEED DATA: User Profile
-  private userProfile: UserProfile = {
-    id: 'user-001',
-    name: 'Alex Vance',
-    age: 32,
-    gender: 'Non-binary',
-    heightCm: 175,
-    weightKg: 71.5,
-    bmi: 23.3,
-    fitnessLevel: 'intermediate',
-    healthConditions: ['Mild lower back tightness after prolonged desk sitting'],
-    fitnessGoals: [
-      'Improve cardiovascular endurance (10k preparation)',
-      'Maintain posterior chain & core strength',
-      'Optimize sleep architecture and stress resilience'
-    ],
-    nutritionGoals: [
-      'Consistent hydration (min 2.5L/day)',
-      'Adequate protein distribution (~1.6g/kg)',
-      'Pre-workout complex carbs'
-    ],
-    activityPreferences: ['Zone 2 Running', 'Bodyweight HIIT', 'Kettlebell flows', 'Mobility yoga'],
-    preferredWorkoutTypes: ['Home functional fitness', 'Short interval training', 'Low-impact active recovery'],
-    preferredEnvironment: 'home',
-    availableEquipment: ['Adjustable dumbbells', 'Pull-up bar', 'Resistance bands', 'Yoga mat', 'Foam roller']
-  };
+export class PersistentHealthPilotDB {
+  private users: Record<string, UserAccount> = {};
+  private userProfiles: Record<string, UserProfile> = {};
+  private dailyContextHistories: Record<string, DailyContext[]> = {};
+  private evolvingStates: Record<string, EvolvingUserState> = {};
+  private goals: Record<string, GoalStrategyItem[]> = {};
+  private outcomes: Record<string, RecommendationOutcome[]> = {};
+  private adaptivePlans: Record<string, AdaptivePlanPayload> = {};
+  private recommendationHistories: Record<string, RecommendationHistoryItem[]> = {};
+  private predictionRecords: Record<string, AdherencePredictionRecord[]> = {};
+  private whatIfScenarios: Record<string, WhatIfScenarioRecord[]> = {};
+  private activeMLModelMetadata: MLModelMetadata | null = null;
 
-  // RESEARCH BASELINE SEED DATA: Daily Context History (Dated Records)
-  private dailyContextHistory: DailyContext[] = [
-    {
-      id: 'ctx-today',
-      userId: 'user-001',
-      date: new Date().toISOString().split('T')[0],
-      sleepHours: 5.8,
-      sleepDuration: 5.8,
-      sleepQuality: 5,
-      energyLevel: 5,
-      energy: 5,
-      fatigueLevel: 7,
-      fatigue: 7,
-      stressLevel: 6,
-      stress: 6,
-      sorenessLevel: 6,
-      soreness: 6,
-      recoveryScore: 48,
-      recoveryStatus: 'low',
-      mood: 'fatigued',
-      cognitiveLoad: 7,
-      availableMinutes: 30,
-      preferredTime: 'morning',
-      environment: 'home',
-      equipmentAvailable: ['Adjustable dumbbells', 'Resistance bands', 'Yoga mat'],
-      activityPreference: 'Mobility & Stretching',
-      currentPreferences: 'Prefer gentle mobility and light tempo, feel tight from yesterday desk work',
-      hydrationLiters: 1.2,
-      notes: 'Slightly fragmented sleep due to late work deadline.',
-      createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
-      updatedAt: new Date().toISOString()
-    },
-    {
-      id: 'ctx-yesterday',
-      userId: 'user-001',
-      date: '2026-09-06',
-      sleepHours: 7.2,
-      sleepDuration: 7.2,
-      sleepQuality: 7,
-      energyLevel: 7,
-      energy: 7,
-      fatigueLevel: 4,
-      fatigue: 4,
-      stressLevel: 4,
-      stress: 4,
-      sorenessLevel: 4,
-      soreness: 4,
-      recoveryScore: 78,
-      recoveryStatus: 'good',
-      mood: 'good',
-      cognitiveLoad: 4,
-      availableMinutes: 40,
-      preferredTime: 'morning',
-      environment: 'home',
-      equipmentAvailable: ['Adjustable dumbbells', 'Resistance bands', 'Pull-up bar', 'Yoga mat'],
-      activityPreference: 'Functional Strength',
-      currentPreferences: 'Feeling balanced, ready for posterior chain strength tempo.',
-      hydrationLiters: 2.4,
-      notes: 'Slept soundly, morning energy was prompt.',
-      createdAt: '2026-09-06T07:15:00.000Z',
-      updatedAt: '2026-09-06T07:15:00.000Z'
-    },
-    {
-      id: 'ctx-d2',
-      userId: 'user-001',
-      date: '2026-09-05',
-      sleepHours: 7.6,
-      sleepDuration: 7.6,
-      sleepQuality: 8,
-      energyLevel: 8,
-      energy: 8,
-      fatigueLevel: 3,
-      fatigue: 3,
-      stressLevel: 3,
-      stress: 3,
-      sorenessLevel: 2,
-      soreness: 2,
-      recoveryScore: 86,
-      recoveryStatus: 'good',
-      mood: 'great',
-      cognitiveLoad: 3,
-      availableMinutes: 50,
-      preferredTime: 'morning',
-      environment: 'outdoor',
-      equipmentAvailable: ['Running shoes', 'GPS watch'],
-      activityPreference: 'Aerobic Cardio',
-      currentPreferences: 'Clear outdoor weather, ideal for aerobic base jog.',
-      hydrationLiters: 2.8,
-      notes: 'Full restorative sleep.',
-      createdAt: '2026-09-05T06:45:00.000Z',
-      updatedAt: '2026-09-05T06:45:00.000Z'
-    },
-    {
-      id: 'ctx-d3',
-      userId: 'user-001',
-      date: '2026-09-04',
-      sleepHours: 6.2,
-      sleepDuration: 6.2,
-      sleepQuality: 6,
-      energyLevel: 6,
-      energy: 6,
-      fatigueLevel: 6,
-      fatigue: 6,
-      stressLevel: 6,
-      stress: 6,
-      sorenessLevel: 4,
-      soreness: 4,
-      recoveryScore: 60,
-      recoveryStatus: 'moderate',
-      mood: 'neutral',
-      cognitiveLoad: 6,
-      availableMinutes: 25,
-      preferredTime: 'evening',
-      environment: 'gym',
-      equipmentAvailable: ['Barbell & Rack', 'Dumbbells', 'Cable machine'],
-      activityPreference: 'Functional Strength',
-      currentPreferences: 'High time compression, quick upper session.',
-      hydrationLiters: 1.8,
-      notes: 'Busy workday, squeezed in workout between meetings.',
-      createdAt: '2026-09-04T17:30:00.000Z',
-      updatedAt: '2026-09-04T17:30:00.000Z'
-    },
-    {
-      id: 'ctx-d4',
-      userId: 'user-001',
-      date: '2026-09-03',
-      sleepHours: 7.0,
-      sleepDuration: 7.0,
-      sleepQuality: 7,
-      energyLevel: 7,
-      energy: 7,
-      fatigueLevel: 4,
-      fatigue: 4,
-      stressLevel: 4,
-      stress: 4,
-      sorenessLevel: 3,
-      soreness: 3,
-      recoveryScore: 76,
-      recoveryStatus: 'good',
-      mood: 'good',
-      cognitiveLoad: 4,
-      availableMinutes: 35,
-      preferredTime: 'morning',
-      environment: 'home',
-      equipmentAvailable: ['Adjustable dumbbells', 'Yoga mat'],
-      activityPreference: 'HIIT',
-      currentPreferences: 'Good readiness for moderate intervals.',
-      hydrationLiters: 2.2,
-      notes: 'Steady morning routine.',
-      createdAt: '2026-09-03T07:10:00.000Z',
-      updatedAt: '2026-09-03T07:10:00.000Z'
-    },
-    {
-      id: 'ctx-d5',
-      userId: 'user-001',
-      date: '2026-09-02',
-      sleepHours: 5.4,
-      sleepDuration: 5.4,
-      sleepQuality: 4,
-      energyLevel: 4,
-      energy: 4,
-      fatigueLevel: 8,
-      fatigue: 8,
-      stressLevel: 7,
-      stress: 7,
-      sorenessLevel: 6,
-      soreness: 6,
-      recoveryScore: 42,
-      recoveryStatus: 'low',
-      mood: 'anxious',
-      cognitiveLoad: 8,
-      availableMinutes: 20,
-      preferredTime: 'evening',
-      environment: 'home',
-      equipmentAvailable: ['Yoga mat', 'Foam roller'],
-      activityPreference: 'Mobility & Stretching',
-      currentPreferences: 'Stressful product release day, low back tightness.',
-      hydrationLiters: 1.4,
-      notes: 'Skipped intense session, did 15 min foam roll.',
-      createdAt: '2026-09-02T19:00:00.000Z',
-      updatedAt: '2026-09-02T19:00:00.000Z'
-    },
-    {
-      id: 'ctx-d6',
-      userId: 'user-001',
-      date: '2026-09-01',
-      sleepHours: 8.0,
-      sleepDuration: 8.0,
-      sleepQuality: 9,
-      energyLevel: 9,
-      energy: 9,
-      fatigueLevel: 2,
-      fatigue: 2,
-      stressLevel: 2,
-      stress: 2,
-      sorenessLevel: 1,
-      soreness: 1,
-      recoveryScore: 92,
-      recoveryStatus: 'good',
-      mood: 'great',
-      cognitiveLoad: 2,
-      availableMinutes: 60,
-      preferredTime: 'morning',
-      environment: 'outdoor',
-      equipmentAvailable: ['Running shoes', 'Resistance bands'],
-      activityPreference: 'Aerobic Cardio',
-      currentPreferences: 'High readiness, completed full 45m trail run.',
-      hydrationLiters: 3.0,
-      notes: 'Holiday recovery day.',
-      createdAt: '2026-09-01T08:00:00.000Z',
-      updatedAt: '2026-09-01T08:00:00.000Z'
+  private readonly dataDir: string;
+  private readonly dbFilePath: string;
+
+  constructor() {
+    this.dataDir = path.resolve(process.cwd(), '.data');
+    this.dbFilePath = path.join(this.dataDir, 'healthpilot_db.json');
+
+    // Ensure .data directory exists
+    try {
+      if (!fs.existsSync(this.dataDir)) {
+        fs.mkdirSync(this.dataDir, { recursive: true });
+      }
+    } catch (err) {
+      console.warn('[DB] Could not verify or create .data directory:', err);
     }
-  ];
 
-  // RESEARCH BASELINE SEED DATA: Current/Latest Daily Context (Pointer to latest dated record)
-  private dailyContext: DailyContext = this.dailyContextHistory[0];
+    // Load persisted data or seed benchmark dataset
+    this.initStore();
 
-  // RESEARCH BASELINE SEED DATA: Multi-Dimensional Evolving User State
-  private evolvingState: EvolvingUserState = {
-    recoveryReadiness: 48,
-    recoveryLevel: 'low',
-    physicalStrainScore: 68,
-    energyState: 'moderate',
-    energyLevel: 5,
-    fatigueState: 'high',
-    fatigueLevel: 7,
-    stressState: 'moderate',
-    stressLevel: 6,
-    cognitiveLoad: 72,
-    behavioralMomentum: 74,
-    behavioralMomentumLabel: 'Moderate',
-    behavioralMomentumRationale: 'Steady routine momentum (74/100) with 8 of 10 recent sessions completed. Preserving consistency while adapting around high fatigue.',
-    weeklyAdherenceRate: 78.5,
-    recentCompletionRatio: '8/10 completed',
-    dominantBarrier: 'Fatigue & Time Crunch',
-    adaptationStatus: 'recovery_needed',
-    availableMinutes: 30,
-    currentEnvironment: 'home',
-    preferredTimeOfDay: 'morning',
-    availableEquipmentCount: 3,
-    primaryGoalTitle: 'Sub-50:00 10K (Endurance)',
-    activeGoalConflictsCount: 2,
-    hasGoalConflict: true,
-    goalConflictSummary: 'Acute physiological fatigue (7/10) and low recovery estimate (48%) conflict with scheduled threshold intervals.',
-    stateExplanation: "Today's recovery readiness is estimated at 48% (LOW) with MODERATE energy and MODERATE stress. With 30 min available at home, the decision model prioritizes restorative autonomic down-regulation to buffer acute sleep debt.",
-    isSystemEstimate: true,
-    lastUpdated: new Date().toISOString()
-  };
-
-  // RESEARCH BASELINE SEED DATA: Historical Outcomes (Empirical Training & Feedback Set)
-  private outcomes: RecommendationOutcome[] = [
-    {
-      id: 'out-14',
-      recommendationId: 'rec-14',
-      recommendedActivity: '30-Min Zone 2 Jog',
-      category: 'workout',
-      plannedDurationMinutes: 30,
-      intensity: 'moderate',
-      contextSnapshot: { sleepHours: 7.2, energyLevel: 7, fatigueLevel: 3, stressLevel: 4, availableMinutes: 45, environment: 'outdoor' },
-      outcomeStatus: 'completed',
-      actualDurationMinutes: 32,
-      userFeedback: 'Felt very smooth, breathing stayed steady.',
-      perceivedEffort: 5,
-      timestamp: new Date(Date.now() - 86400000 * 1).toISOString()
-    },
-    {
-      id: 'out-13',
-      recommendationId: 'rec-13',
-      recommendedActivity: '45-Min Heavy Gym Strength',
-      category: 'workout',
-      plannedDurationMinutes: 45,
-      intensity: 'high',
-      contextSnapshot: { sleepHours: 5.5, energyLevel: 4, fatigueLevel: 8, stressLevel: 7, availableMinutes: 50, environment: 'gym' },
-      outcomeStatus: 'skipped',
-      actualDurationMinutes: 0,
-      reasonForSkipOrPartial: 'too_tired',
-      userFeedback: 'Worked late, felt completely drained. Could not commute to gym.',
-      timestamp: new Date(Date.now() - 86400000 * 2).toISOString()
-    },
-    {
-      id: 'out-12',
-      recommendationId: 'rec-12',
-      recommendedActivity: '20-Min Home Core & Bands',
-      category: 'lighter_activity',
-      plannedDurationMinutes: 20,
-      intensity: 'low',
-      contextSnapshot: { sleepHours: 6.0, energyLevel: 5, fatigueLevel: 6, stressLevel: 5, availableMinutes: 25, environment: 'home' },
-      outcomeStatus: 'completed',
-      actualDurationMinutes: 22,
-      userFeedback: 'Great alternative. Hit the spot without causing exhaustion.',
-      perceivedEffort: 4,
-      timestamp: new Date(Date.now() - 86400000 * 3).toISOString()
-    },
-    {
-      id: 'out-11',
-      recommendationId: 'rec-11',
-      recommendedActivity: '25-Min Dumbbell Circuit',
-      category: 'workout',
-      plannedDurationMinutes: 25,
-      intensity: 'moderate',
-      contextSnapshot: { sleepHours: 7.5, energyLevel: 8, fatigueLevel: 3, stressLevel: 3, availableMinutes: 35, environment: 'home' },
-      outcomeStatus: 'completed',
-      actualDurationMinutes: 26,
-      userFeedback: 'Strong workout, completed all rounds.',
-      perceivedEffort: 6,
-      timestamp: new Date(Date.now() - 86400000 * 4).toISOString()
-    },
-    {
-      id: 'out-10',
-      recommendationId: 'rec-10',
-      recommendedActivity: '40-Min Outdoor Intervals',
-      category: 'workout',
-      plannedDurationMinutes: 40,
-      intensity: 'high',
-      contextSnapshot: { sleepHours: 6.2, energyLevel: 5, fatigueLevel: 6, stressLevel: 6, availableMinutes: 45, environment: 'outdoor' },
-      outcomeStatus: 'partially_completed',
-      actualDurationMinutes: 20,
-      reasonForSkipOrPartial: 'no_time',
-      userFeedback: 'Cut short due to sudden work meeting call.',
-      perceivedEffort: 7,
-      timestamp: new Date(Date.now() - 86400000 * 5).toISOString()
-    },
-    {
-      id: 'out-09',
-      recommendationId: 'rec-09',
-      recommendedActivity: '20-Min Guided Mobility & Foam Roll',
-      category: 'recovery',
-      plannedDurationMinutes: 20,
-      intensity: 'low',
-      contextSnapshot: { sleepHours: 5.2, energyLevel: 4, fatigueLevel: 7, stressLevel: 8, availableMinutes: 30, environment: 'home' },
-      outcomeStatus: 'completed',
-      actualDurationMinutes: 20,
-      userFeedback: 'Spine felt so much better afterwards.',
-      perceivedEffort: 2,
-      timestamp: new Date(Date.now() - 86400000 * 6).toISOString()
-    },
-    {
-      id: 'out-08',
-      recommendationId: 'rec-08',
-      recommendedActivity: '50-Min Gym Leg Session',
-      category: 'workout',
-      plannedDurationMinutes: 50,
-      intensity: 'high',
-      contextSnapshot: { sleepHours: 6.0, energyLevel: 4, fatigueLevel: 8, stressLevel: 6, availableMinutes: 40, environment: 'gym' },
-      outcomeStatus: 'skipped',
-      actualDurationMinutes: 0,
-      reasonForSkipOrPartial: 'schedule_changed',
-      userFeedback: 'Did not have travel time to the gym facility.',
-      timestamp: new Date(Date.now() - 86400000 * 7).toISOString()
-    },
-    {
-      id: 'out-07',
-      recommendationId: 'rec-07',
-      recommendedActivity: '25-Min Home Dumbbell Strength',
-      category: 'workout',
-      plannedDurationMinutes: 25,
-      intensity: 'moderate',
-      contextSnapshot: { sleepHours: 7.0, energyLevel: 7, fatigueLevel: 4, stressLevel: 4, availableMinutes: 35, environment: 'home' },
-      outcomeStatus: 'completed',
-      actualDurationMinutes: 25,
-      userFeedback: 'Good rhythm, consistent rest intervals.',
-      perceivedEffort: 6,
-      timestamp: new Date(Date.now() - 86400000 * 8).toISOString()
-    },
-    {
-      id: 'out-06',
-      recommendationId: 'rec-06',
-      recommendedActivity: '35-Min Aerobic Zone 2 Run',
-      category: 'workout',
-      plannedDurationMinutes: 35,
-      intensity: 'moderate',
-      contextSnapshot: { sleepHours: 7.4, energyLevel: 8, fatigueLevel: 3, stressLevel: 3, availableMinutes: 50, environment: 'outdoor' },
-      outcomeStatus: 'completed',
-      actualDurationMinutes: 36,
-      userFeedback: 'Felt very energized, heart rate stayed in Zone 2 throughout.',
-      perceivedEffort: 5,
-      timestamp: new Date(Date.now() - 86400000 * 9).toISOString()
-    },
-    {
-      id: 'out-05',
-      recommendationId: 'rec-05',
-      recommendedActivity: '45-Min Heavy Gym Strength',
-      category: 'workout',
-      plannedDurationMinutes: 45,
-      intensity: 'high',
-      contextSnapshot: { sleepHours: 5.8, energyLevel: 4, fatigueLevel: 7, stressLevel: 6, availableMinutes: 45, environment: 'gym' },
-      outcomeStatus: 'partially_completed',
-      actualDurationMinutes: 25,
-      reasonForSkipOrPartial: 'too_tired',
-      userFeedback: 'Felt heavy and sluggish, stopped after squats to avoid strain.',
-      perceivedEffort: 8,
-      timestamp: new Date(Date.now() - 86400000 * 10).toISOString()
-    },
-    {
-      id: 'out-04',
-      recommendationId: 'rec-04',
-      recommendedActivity: '15-Min Active Recovery & Foam Roll',
-      category: 'recovery',
-      plannedDurationMinutes: 15,
-      intensity: 'low',
-      contextSnapshot: { sleepHours: 6.0, energyLevel: 5, fatigueLevel: 7, stressLevel: 7, availableMinutes: 20, environment: 'home' },
-      outcomeStatus: 'completed',
-      actualDurationMinutes: 15,
-      userFeedback: 'Short and restorative session, helped lower back tension.',
-      perceivedEffort: 2,
-      timestamp: new Date(Date.now() - 86400000 * 11).toISOString()
-    },
-    {
-      id: 'out-03',
-      recommendationId: 'rec-03',
-      recommendedActivity: '30-Min Bodyweight HIIT',
-      category: 'workout',
-      plannedDurationMinutes: 30,
-      intensity: 'high',
-      contextSnapshot: { sleepHours: 7.2, energyLevel: 7, fatigueLevel: 4, stressLevel: 4, availableMinutes: 40, environment: 'home' },
-      outcomeStatus: 'completed',
-      actualDurationMinutes: 30,
-      userFeedback: 'High heart rate spikes, finished strong.',
-      perceivedEffort: 7,
-      timestamp: new Date(Date.now() - 86400000 * 12).toISOString()
-    },
-    {
-      id: 'out-02',
-      recommendationId: 'rec-02',
-      recommendedActivity: '20-Min Yoga & Thoracic Flow',
-      category: 'recovery',
-      plannedDurationMinutes: 20,
-      intensity: 'low',
-      contextSnapshot: { sleepHours: 6.8, energyLevel: 6, fatigueLevel: 5, stressLevel: 5, availableMinutes: 30, environment: 'home' },
-      outcomeStatus: 'completed',
-      actualDurationMinutes: 20,
-      userFeedback: 'Great mobility release for shoulders and hips.',
-      perceivedEffort: 3,
-      timestamp: new Date(Date.now() - 86400000 * 13).toISOString()
-    },
-    {
-      id: 'out-01',
-      recommendationId: 'rec-01',
-      recommendedActivity: '45-Min Outdoor Tempo Run',
-      category: 'workout',
-      plannedDurationMinutes: 45,
-      intensity: 'high',
-      contextSnapshot: { sleepHours: 6.2, energyLevel: 6, fatigueLevel: 5, stressLevel: 7, availableMinutes: 30, environment: 'outdoor' },
-      outcomeStatus: 'skipped',
-      actualDurationMinutes: 0,
-      reasonForSkipOrPartial: 'no_time',
-      userFeedback: 'Had only 30m window before client call; 45m tempo run was impossible to fit.',
-      timestamp: new Date(Date.now() - 86400000 * 14).toISOString()
-    }
-  ];
-
-  // ADHERENCE PREDICTION LEDGER & ML MODEL REGISTRY
-  private predictionRecords: AdherencePredictionRecord[] = [
-    {
-      id: 'pred-today',
-      userId: 'user-001',
-      recommendationId: 'rec-today',
-      recommendationTitle: '20-Min Guided Mobility & Decompression Flow',
-      predictionProbability: 0.88,
-      predictedAdherence: 88,
-      predictedClass: 1,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: {
-        sleep_hours: 5.8,
-        energy_level: 5,
-        fatigue_level: 7,
-        stress_level: 6,
-        available_minutes: 35,
-        recommended_duration_minutes: 20,
-        environment: 'home',
-        intensity: 'low'
-      },
-      predictionTimestamp: new Date().toISOString()
-    },
-    {
-      id: 'pred-13',
-      userId: 'user-001',
-      recommendationId: 'rec-13',
-      recommendationTitle: '45-Min Heavy Gym Strength',
-      predictionProbability: 0.28,
-      predictedAdherence: 28,
-      predictedClass: 0,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 5.5, energy_level: 4, fatigue_level: 8, stress_level: 7, available_minutes: 50, recommended_duration_minutes: 45, environment: 'gym', intensity: 'high' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 2).toISOString(),
-      actualOutcomeStatus: 'skipped',
-      actualDurationMinutes: 0
-    },
-    {
-      id: 'pred-12',
-      userId: 'user-001',
-      recommendationId: 'rec-12',
-      recommendationTitle: '20-Min Home Core & Bands',
-      predictionProbability: 0.84,
-      predictedAdherence: 84,
-      predictedClass: 1,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 6.0, energy_level: 5, fatigue_level: 6, stress_level: 5, available_minutes: 25, recommended_duration_minutes: 20, environment: 'home', intensity: 'low' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 3).toISOString(),
-      actualOutcomeStatus: 'completed',
-      actualDurationMinutes: 22
-    },
-    {
-      id: 'pred-11',
-      userId: 'user-001',
-      recommendationId: 'rec-11',
-      recommendationTitle: '25-Min Dumbbell Circuit',
-      predictionProbability: 0.91,
-      predictedAdherence: 91,
-      predictedClass: 1,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 7.5, energy_level: 8, fatigue_level: 3, stress_level: 3, available_minutes: 35, recommended_duration_minutes: 25, environment: 'home', intensity: 'moderate' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 4).toISOString(),
-      actualOutcomeStatus: 'completed',
-      actualDurationMinutes: 26
-    },
-    {
-      id: 'pred-10',
-      userId: 'user-001',
-      recommendationId: 'rec-10',
-      recommendationTitle: '40-Min Outdoor Intervals',
-      predictionProbability: 0.44,
-      predictedAdherence: 44,
-      predictedClass: 0,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 6.2, energy_level: 5, fatigue_level: 6, stress_level: 6, available_minutes: 45, recommended_duration_minutes: 40, environment: 'outdoor', intensity: 'high' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 5).toISOString(),
-      actualOutcomeStatus: 'partially_completed',
-      actualDurationMinutes: 20
-    },
-    {
-      id: 'pred-09',
-      userId: 'user-001',
-      recommendationId: 'rec-09',
-      recommendationTitle: '20-Min Guided Mobility & Foam Roll',
-      predictionProbability: 0.86,
-      predictedAdherence: 86,
-      predictedClass: 1,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 5.2, energy_level: 4, fatigue_level: 7, stress_level: 8, available_minutes: 30, recommended_duration_minutes: 20, environment: 'home', intensity: 'low' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 6).toISOString(),
-      actualOutcomeStatus: 'completed',
-      actualDurationMinutes: 20
-    },
-    {
-      id: 'pred-08',
-      userId: 'user-001',
-      recommendationId: 'rec-08',
-      recommendationTitle: '50-Min Gym Leg Session',
-      predictionProbability: 0.31,
-      predictedAdherence: 31,
-      predictedClass: 0,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 6.0, energy_level: 4, fatigue_level: 8, stress_level: 6, available_minutes: 40, recommended_duration_minutes: 50, environment: 'gym', intensity: 'high' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 7).toISOString(),
-      actualOutcomeStatus: 'skipped',
-      actualDurationMinutes: 0
-    },
-    {
-      id: 'pred-07',
-      userId: 'user-001',
-      recommendationId: 'rec-07',
-      recommendationTitle: '25-Min Home Dumbbell Strength',
-      predictionProbability: 0.87,
-      predictedAdherence: 87,
-      predictedClass: 1,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 7.0, energy_level: 7, fatigue_level: 4, stress_level: 4, available_minutes: 35, recommended_duration_minutes: 25, environment: 'home', intensity: 'moderate' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 8).toISOString(),
-      actualOutcomeStatus: 'completed',
-      actualDurationMinutes: 25
-    },
-    {
-      id: 'pred-06',
-      userId: 'user-001',
-      recommendationId: 'rec-06',
-      recommendationTitle: '35-Min Aerobic Zone 2 Run',
-      predictionProbability: 0.89,
-      predictedAdherence: 89,
-      predictedClass: 1,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 7.4, energy_level: 8, fatigue_level: 3, stress_level: 3, available_minutes: 50, recommended_duration_minutes: 35, environment: 'outdoor', intensity: 'moderate' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 9).toISOString(),
-      actualOutcomeStatus: 'completed',
-      actualDurationMinutes: 36
-    },
-    {
-      id: 'pred-05',
-      userId: 'user-001',
-      recommendationId: 'rec-05',
-      recommendationTitle: '45-Min Heavy Gym Strength',
-      predictionProbability: 0.33,
-      predictedAdherence: 33,
-      predictedClass: 0,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 5.8, energy_level: 4, fatigue_level: 7, stress_level: 6, available_minutes: 45, recommended_duration_minutes: 45, environment: 'gym', intensity: 'high' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 10).toISOString(),
-      actualOutcomeStatus: 'skipped',
-      actualDurationMinutes: 0
-    },
-    {
-      id: 'pred-04',
-      userId: 'user-001',
-      recommendationId: 'rec-04',
-      recommendationTitle: '30-Min High-Rep Dumbbell Circuit',
-      predictionProbability: 0.76,
-      predictedAdherence: 76,
-      predictedClass: 1,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 6.5, energy_level: 6, fatigue_level: 5, stress_level: 5, available_minutes: 40, recommended_duration_minutes: 30, environment: 'home', intensity: 'moderate' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 11).toISOString(),
-      actualOutcomeStatus: 'partially_completed',
-      actualDurationMinutes: 18
-    },
-    {
-      id: 'pred-03',
-      userId: 'user-001',
-      recommendationId: 'rec-03',
-      recommendationTitle: '30-Min Cardio Intervals',
-      predictionProbability: 0.82,
-      predictedAdherence: 82,
-      predictedClass: 1,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 7.2, energy_level: 7, fatigue_level: 4, stress_level: 4, available_minutes: 40, recommended_duration_minutes: 30, environment: 'home', intensity: 'high' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 12).toISOString(),
-      actualOutcomeStatus: 'completed',
-      actualDurationMinutes: 30
-    },
-    {
-      id: 'pred-02',
-      userId: 'user-001',
-      recommendationId: 'rec-02',
-      recommendationTitle: '20-Min Yoga & Thoracic Flow',
-      predictionProbability: 0.93,
-      predictedAdherence: 93,
-      predictedClass: 1,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 6.8, energy_level: 6, fatigue_level: 5, stress_level: 5, available_minutes: 30, recommended_duration_minutes: 20, environment: 'home', intensity: 'low' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 13).toISOString(),
-      actualOutcomeStatus: 'completed',
-      actualDurationMinutes: 20
-    },
-    {
-      id: 'pred-01',
-      userId: 'user-001',
-      recommendationId: 'rec-01',
-      recommendationTitle: '45-Min Outdoor Tempo Run',
-      predictionProbability: 0.25,
-      predictedAdherence: 25,
-      predictedClass: 0,
-      modelName: 'Logistic Regression',
-      modelVersion: '1.0.0-prototype',
-      isBaselineFallback: false,
-      dataSourceLabel: 'Demonstration model trained on seed data',
-      featureSnapshot: { sleep_hours: 6.2, energy_level: 6, fatigue_level: 5, stress_level: 7, available_minutes: 30, recommended_duration_minutes: 45, environment: 'outdoor', intensity: 'high' },
-      predictionTimestamp: new Date(Date.now() - 86400000 * 14).toISOString(),
-      actualOutcomeStatus: 'skipped',
-      actualDurationMinutes: 0
-    }
-  ];
-
-  private activeMLModelMetadata: MLModelMetadata | null = {
-    modelName: 'Logistic Regression (Calibrated)',
-    modelVersion: '1.0.0-prototype',
-    algorithmFamily: 'LogisticRegression',
-    isBaselineFallback: false,
-    dataSource: 'Demonstration model trained on seed data',
-    trainingSamplesCount: 14,
-    evaluationMetrics: {
-      brierScore: 0.1391,
-      rocAuc: 0.9000,
-      f1Score: 0.8571,
-      accuracy: 0.8571,
-      precision: 0.8889,
-      recall: 0.8889,
-      meanAbsoluteError: 15.2,
-      accuracyWithin15Percent: 78.6,
-      calibrationQuality: 'Well Calibrated (Brier < 0.15)'
-    },
-    hyperparameters: {
-      penalty: 'l2',
-      C: 1.0,
-      class_weight: 'balanced',
-      solver: 'lbfgs'
-    },
-    featureImportances: [
-      { feature: 'time_margin_minutes', importance: 0.32, direction: 'positive' },
-      { feature: 'fatigue_level', importance: -0.28, direction: 'negative' },
-      { feature: 'is_home_environment', importance: 0.24, direction: 'positive' },
-      { feature: 'is_gym_environment', importance: -0.19, direction: 'negative' },
-      { feature: 'energy_level', importance: 0.18, direction: 'positive' },
-      { feature: 'sleep_hours', importance: 0.15, direction: 'positive' },
-      { feature: 'stress_level', importance: -0.12, direction: 'negative' }
-    ],
-    trainedAt: new Date().toISOString(),
-    evaluationSplit: 'Stratified 5-Fold Cross Validation'
-  };
-
-  // RESEARCH BASELINE SEED DATA: Goals with Milestones & Conflict Flags
-  private goals: GoalStrategyItem[] = [
-    {
-      id: 'goal-1',
-      title: 'Cardiovascular Aerobic Base (10K sub-50 min)',
-      category: 'endurance',
-      targetDate: '2026-11-15',
-      timeframe: '8 Weeks Remaining',
-      targetValue: 'Sub-50:00 10K',
-      currentValue: '54:20 Pace',
-      currentProgress: 64,
-      status: 'needs_adaptation',
-      priority: 'primary',
-      conflictStatus: 'transient_conflict',
-      activeConflictFlag: true,
-      conflictNote: 'Low sleep recovery (48%) conflicts with scheduled threshold intervals.',
-      strategyAdjustment: 'Pivot today to low-intensity restorative mobility; shift threshold work to day after tomorrow upon recovery rebound.',
-      strategyAdjustmentNote: 'Acute sleep deficit (5.8h) down-regulated today\'s threshold intervals to preserve nervous system reserve while maintaining training consistency.',
-      milestones: [
-        { id: 'm1', title: '5K Baseline under 26m', completed: true },
-        { id: 'm2', title: 'Zone 2 45-min Continuous Run', completed: true },
-        { id: 'm3', title: 'Pace Threshold 4x4 min at 4:55/km', completed: false }
-      ]
-    },
-    {
-      id: 'goal-2',
-      title: 'Posterior Chain & Core Stability',
-      category: 'strength',
-      targetDate: '2026-12-01',
-      timeframe: '12 Weeks Remaining',
-      targetValue: '2x Bodyweight Deadlift',
-      currentValue: '1.6x Bodyweight',
-      currentProgress: 72,
-      status: 'on_track',
-      priority: 'secondary',
-      conflictStatus: 'none',
-      activeConflictFlag: false,
-      strategyAdjustment: 'Steady progressive overload with home dumbbell Romanian deadlifts and bird-dogs.',
-      strategyAdjustmentNote: 'Bi-weekly progression progressing on track with home dumbbells and resistance band volume.',
-      milestones: [
-        { id: 'm4', title: '3-min Continuous Plank', completed: true },
-        { id: 'm5', title: '10 Single-Leg Romanian Deadlifts per leg', completed: true },
-        { id: 'm6', title: 'Heavy Kettlebell Clean & Press Progression', completed: false }
-      ]
-    },
-    {
-      id: 'goal-3',
-      title: 'Sleep Hygiene & Nervous System Recovery',
-      category: 'sleep',
-      targetDate: '2026-10-30',
-      timeframe: '6 Weeks Remaining',
-      targetValue: 'Avg 7.5h / 85% Recovery',
-      currentValue: '6.2h / 68% Recovery',
-      currentProgress: 58,
-      status: 'needs_adaptation',
-      priority: 'primary',
-      conflictStatus: 'transient_conflict',
-      activeConflictFlag: true,
-      conflictNote: 'Late screen time and work deadlines lowering sleep duration to 5.8h.',
-      strategyAdjustment: 'Prescribe evening down-regulation protocol and eliminate late sympathetic nervous stimulation.',
-      strategyAdjustmentNote: 'Dynamic guardrail: Automatically down-regulates daily training load when sleep is below 6 hours.',
-      milestones: [
-        { id: 'm7', title: '7 consecutive days with no screen 45m before bed', completed: true },
-        { id: 'm8', title: 'Consistent bedtime window (+/- 30 min)', completed: false },
-        { id: 'm9', title: 'Sleep efficiency score above 85% for 14 days', completed: false }
-      ]
-    }
-  ];
-
-  // RESEARCH BASELINE SEED DATA: Adaptive Weekly Schedule
-  private adaptivePlan: AdaptivePlanDay[] = [
-    {
-      id: 'plan-day-1',
-      dayOfWeek: 'Monday',
-      dayName: 'Monday',
-      date: '2026-09-07',
-      title: '20-Min Restorative Spinal Mobility & Breathwork',
-      plannedSession: '20-Min Restorative Spinal Mobility & Breathwork',
-      category: 'recovery',
-      durationMinutes: 20,
-      intensity: 'low',
-      isAdaptiveAdapted: true,
-      adaptationReason: 'Adapted from high-intensity intervals due to acute sleep deficit (5.8h) and high fatigue.',
-      status: 'scheduled'
-    },
-    {
-      id: 'plan-day-2',
-      dayOfWeek: 'Tuesday',
-      dayName: 'Tuesday',
-      date: '2026-09-08',
-      title: '25-Min Home Dumbbell Strength (Posterior Focus)',
-      plannedSession: '25-Min Home Dumbbell Strength (Posterior Focus)',
-      category: 'workout',
-      durationMinutes: 25,
-      intensity: 'moderate',
-      isAdaptiveAdapted: false,
-      status: 'scheduled'
-    },
-    {
-      id: 'plan-day-3',
-      dayOfWeek: 'Wednesday',
-      dayName: 'Wednesday',
-      date: '2026-09-09',
-      title: '35-Min Aerobic Zone 2 Base Run',
-      plannedSession: '35-Min Aerobic Zone 2 Base Run',
-      category: 'workout',
-      durationMinutes: 35,
-      intensity: 'moderate',
-      isAdaptiveAdapted: false,
-      status: 'scheduled'
-    },
-    {
-      id: 'plan-day-4',
-      dayOfWeek: 'Thursday',
-      dayName: 'Thursday',
-      date: '2026-09-10',
-      title: 'Active Rest & Parasympathetic Walk',
-      plannedSession: 'Active Rest & Parasympathetic Walk',
-      category: 'active_rest',
-      durationMinutes: 25,
-      intensity: 'low',
-      isAdaptiveAdapted: false,
-      status: 'scheduled'
-    },
-    {
-      id: 'plan-day-5',
-      dayOfWeek: 'Friday',
-      dayName: 'Friday',
-      date: '2026-09-11',
-      title: 'Threshold Pace Intervals (4 x 4 min)',
-      plannedSession: 'Threshold Pace Intervals (4 x 4 min)',
-      category: 'workout',
-      durationMinutes: 35,
-      intensity: 'high',
-      isAdaptiveAdapted: true,
-      adaptationReason: 'Shifted from Monday to allow full recovery buffer.',
-      status: 'scheduled'
-    },
-    {
-      id: 'plan-day-6',
-      dayOfWeek: 'Saturday',
-      dayName: 'Saturday',
-      date: '2026-09-12',
-      title: 'Full Body Functional Kettlebell Circuit',
-      plannedSession: 'Full Body Functional Kettlebell Circuit',
-      category: 'workout',
-      durationMinutes: 30,
-      intensity: 'moderate',
-      isAdaptiveAdapted: false,
-      status: 'scheduled'
-    },
-    {
-      id: 'plan-day-7',
-      dayOfWeek: 'Sunday',
-      dayName: 'Sunday',
-      date: '2026-09-13',
-      title: 'Deload & Deep Tissue Recovery Flow',
-      plannedSession: 'Deload & Deep Tissue Recovery Flow',
-      category: 'recovery',
-      durationMinutes: 30,
-      intensity: 'low',
-      isAdaptiveAdapted: false,
-      status: 'scheduled'
-    }
-  ];
-
-  // RESEARCH BASELINE SEED DATA: Recommendation History Audit Trail
-  private recommendationHistory: RecommendationHistoryItem[] = [
-    {
-      id: 'rec-hist-1',
-      date: 'Today, 7:15 AM',
-      title: 'Restorative Thoracic Mobility & Deep Decompression',
-      durationMinutes: 20,
-      intensity: 'low',
-      environment: 'home',
-      predictedAdherence: 88,
-      suitability: 94,
-      status: 'Decision Issued (Awaiting Outcome)',
-      context: 'Sleep 5.8h • Fatigue 7/10 • Home • 30m Available',
-      rationale: 'Severe sleep deficit + high fatigue triggered down-regulation from planned HIIT.'
-    },
-    {
-      id: 'rec-hist-2',
-      date: 'Yesterday, 6:45 AM',
-      title: 'Full Body Functional Strength Tempo',
-      durationMinutes: 30,
-      intensity: 'moderate',
-      environment: 'home',
-      predictedAdherence: 82,
-      suitability: 85,
-      status: 'Completed (30m)',
-      context: 'Sleep 7.1h • Fatigue 4/10 • Home • 40m Available',
-      rationale: 'Good recovery score enabled progressive dumbbell resistance tempo.'
-    },
-    {
-      id: 'rec-hist-3',
-      date: '2 Days Ago, 7:00 AM',
-      title: 'Aerobic Zone 2 Baseline Jog',
-      durationMinutes: 35,
-      intensity: 'moderate',
-      environment: 'outdoor',
-      predictedAdherence: 78,
-      suitability: 80,
-      status: 'Completed (35m)',
-      context: 'Sleep 7.5h • Fatigue 3/10 • Outdoor • 50m Available',
-      rationale: 'Cardiovascular aerobic base development.'
-    },
-    {
-      id: 'rec-hist-4',
-      date: '3 Days Ago, 6:30 AM',
-      title: 'Max Effort Upper Body Hypertrophy',
-      durationMinutes: 45,
-      intensity: 'high',
-      environment: 'gym',
-      predictedAdherence: 52,
-      suitability: 60,
-      status: 'Partially Completed (20m - No Time)',
-      context: 'Sleep 6.2h • Fatigue 6/10 • Gym • 25m Available',
-      rationale: 'High time compression led to early truncation; system adjusted subsequent rest.'
-    }
-  ];
-
-  // What-If Counterfactual Logs
-  private whatIfScenarios: WhatIfScenarioRecord[] = [];
-
-  // Repository methods
-  public getUserProfile(): UserProfile {
-    return { ...this.userProfile };
-  }
-
-  public updateUserProfile(updates: Partial<UserProfile>): UserProfile {
-    this.userProfile = {
-      ...this.userProfile,
-      ...updates,
-      // Recalculate BMI if height/weight changed
-      bmi: Number(((updates.weightKg ?? this.userProfile.weightKg) / Math.pow((updates.heightCm ?? this.userProfile.heightCm) / 100, 2)).toFixed(1))
-    };
-    return { ...this.userProfile };
+    // Connect to MongoDB if MONGODB_URI is set
+    connectMongoDB().catch(err => {
+      console.warn('[DB] Background MongoDB connection check:', err?.message);
+    });
   }
 
   /**
-   * Transparent System Estimate: Recovery Readiness Calculation
-   * Combines sleep duration sufficiency, sleep quality multiplier, and subjective energy readiness,
-   * penalized by acute systemic fatigue, stress, and muscle soreness.
-   * NOTE: This is an application-level heuristic system estimate, NOT a medically validated physiological measurement.
+   * Initializes store: reads from disk, or seeds the benchmark research participant if file does not exist.
    */
+  private initStore(): void {
+    if (fs.existsSync(this.dbFilePath)) {
+      try {
+        const raw = fs.readFileSync(this.dbFilePath, 'utf-8');
+        const data: PersistedStoreData = JSON.parse(raw);
+        this.users = data.users || {};
+        this.userProfiles = data.userProfiles || {};
+        this.dailyContextHistories = data.dailyContextHistories || {};
+        this.evolvingStates = data.evolvingStates || {};
+        this.goals = data.goals || {};
+        this.outcomes = data.outcomes || {};
+        this.adaptivePlans = data.adaptivePlans || {};
+        this.recommendationHistories = data.recommendationHistories || {};
+        this.predictionRecords = data.predictionRecords || {};
+        this.whatIfScenarios = data.whatIfScenarios || {};
+        this.activeMLModelMetadata = data.activeMLModelMetadata || null;
+
+        console.log(`[DB] Successfully loaded persistent store from disk. Total users: ${Object.keys(this.users).length}.`);
+        return;
+      } catch (err: any) {
+        console.error('[DB] Error parsing existing db file. Will reinitialize safely:', err?.message);
+      }
+    }
+
+    // Initialize with research participant user-001 (Alex Vance)
+    console.log('[DB] Initializing new persistent store with research benchmark baseline...');
+    this.seedBenchmarkData();
+    this.persist();
+  }
+
+  /**
+   * Synchronously persists all data to disk and asynchronously syncs to MongoDB if connected
+   */
+  public persist(): void {
+    const data: PersistedStoreData = {
+      users: this.users,
+      userProfiles: this.userProfiles,
+      dailyContextHistories: this.dailyContextHistories,
+      evolvingStates: this.evolvingStates,
+      goals: this.goals,
+      outcomes: this.outcomes,
+      adaptivePlans: this.adaptivePlans,
+      recommendationHistories: this.recommendationHistories,
+      predictionRecords: this.predictionRecords,
+      whatIfScenarios: this.whatIfScenarios,
+      activeMLModelMetadata: this.activeMLModelMetadata
+    };
+
+    try {
+      if (!fs.existsSync(this.dataDir)) {
+        fs.mkdirSync(this.dataDir, { recursive: true });
+      }
+      const tmpPath = `${this.dbFilePath}.tmp`;
+      fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+      fs.renameSync(tmpPath, this.dbFilePath);
+    } catch (err: any) {
+      console.error('[DB] Failed to persist data to disk:', err?.message);
+    }
+
+    // Sync to MongoDB in background if connected
+    if (isMongoDBConnected()) {
+      this.syncToMongoDB(data).catch(err => {
+        console.warn('[MongoDB] Sync error:', err?.message);
+      });
+    }
+  }
+
+  private async syncToMongoDB(data: PersistedStoreData): Promise<void> {
+    try {
+      const models = getMongoModels();
+      for (const [userId, profile] of Object.entries(data.userProfiles)) {
+        await models.UserProfile.findOneAndUpdate(
+          { userId },
+          { ...profile, userId },
+          { upsert: true }
+        ).catch(() => {});
+      }
+      for (const [userId, user] of Object.entries(data.users)) {
+        await models.User.findOneAndUpdate(
+          { _id: user.id },
+          {
+            email: user.email,
+            passwordHash: user.passwordHash,
+            name: user.name,
+            role: user.role,
+            timezone: user.timezone,
+            onboardingComplete: user.onboardingComplete
+          },
+          { upsert: true }
+        ).catch(() => {});
+      }
+    } catch {
+      // Non-blocking sync
+    }
+  }
+
+  // ==========================================
+  // AUTH & USER ACCOUNT MANAGEMENT
+  // ==========================================
+
+  public createUser(userData: {
+    email: string;
+    passwordHash: string;
+    name: string;
+    role?: 'research_participant' | 'user' | 'admin';
+    onboardingComplete?: boolean;
+  }): UserAccount {
+    const id = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const now = new Date().toISOString();
+
+    const user: UserAccount = {
+      id,
+      email: userData.email.toLowerCase().trim(),
+      passwordHash: userData.passwordHash,
+      name: userData.name.trim(),
+      role: userData.role || 'user',
+      timezone: 'UTC',
+      onboardingComplete: userData.onboardingComplete ?? false,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    this.users[id] = user;
+
+    // Initialize user profile
+    this.userProfiles[id] = {
+      id,
+      name: user.name,
+      age: 30,
+      gender: 'Not specified',
+      heightCm: 175,
+      weightKg: 70,
+      bmi: 22.9,
+      fitnessLevel: 'intermediate',
+      healthConditions: [],
+      fitnessGoals: ['Build daily exercise consistency', 'Improve overall cardiovascular stamina'],
+      nutritionGoals: ['Consistent hydration (min 2.0L/day)'],
+      activityPreferences: ['Zone 2 Running', 'Bodyweight HIIT', 'Mobility & Stretching'],
+      preferredWorkoutTypes: ['Home functional fitness', 'Low-impact active recovery'],
+      preferredEnvironment: 'home',
+      availableEquipment: ['Yoga mat', 'Adjustable dumbbells']
+    };
+
+    // Initialize daily context
+    const todayDate = new Date().toISOString().split('T')[0];
+    const initialCtx: DailyContext = {
+      id: `ctx-${id}-today`,
+      userId: id,
+      date: todayDate,
+      sleepHours: 7.0,
+      sleepDuration: 7.0,
+      sleepQuality: 7,
+      energyLevel: 6,
+      energy: 6,
+      fatigueLevel: 5,
+      fatigue: 5,
+      stressLevel: 4,
+      stress: 4,
+      sorenessLevel: 2,
+      soreness: 2,
+      recoveryScore: 72,
+      recoveryStatus: 'good',
+      mood: 'good',
+      cognitiveLoad: 4,
+      availableMinutes: 30,
+      preferredTime: 'morning',
+      environment: 'home',
+      equipmentAvailable: ['Yoga mat', 'Adjustable dumbbells'],
+      activityPreference: 'Mobility & Stretching',
+      currentPreferences: 'Starting my personalized health habit with HealthPilot AI.',
+      hydrationLiters: 1.8,
+      notes: 'Initial profile setup'
+    };
+
+    this.dailyContextHistories[id] = [initialCtx];
+
+    // Initialize goals
+    this.goals[id] = [
+      {
+        id: `goal-${id}-1`,
+        title: 'Daily Health Consistency Habit',
+        category: 'consistency',
+        currentProgress: 15,
+        targetDate: new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0],
+        priority: 'primary',
+        status: 'on_track',
+        conflictStatus: 'none',
+        activeConflictFlag: false,
+        timeframe: '4 Weeks',
+        targetValue: '5 Sessions / Week',
+        currentValue: '1 Session Logged',
+        strategyAdjustment: 'Anchor workout at 8:00 AM after breakfast.',
+        milestones: [
+          { id: 'm1', title: 'Complete 3 consecutive days', completed: false },
+          { id: 'm2', title: 'Establish recovery day habit', completed: false }
+        ]
+      },
+      {
+        id: `goal-${id}-2`,
+        title: 'Aerobic Stamina & Energy Optimization',
+        category: 'endurance',
+        currentProgress: 20,
+        targetDate: new Date(Date.now() + 86400000 * 60).toISOString().split('T')[0],
+        priority: 'secondary',
+        status: 'on_track',
+        conflictStatus: 'none',
+        activeConflictFlag: false,
+        timeframe: '8 Weeks',
+        targetValue: 'Zone 2 35 Min Base',
+        currentValue: '20 Min Base',
+        strategyAdjustment: 'Prioritize low-intensity aerobic walks and cycling.'
+      }
+    ];
+
+    this.outcomes[id] = [];
+    this.recommendationHistories[id] = [];
+    this.predictionRecords[id] = [];
+    this.whatIfScenarios[id] = [];
+
+    // Initialize adaptive plan
+    this.adaptivePlans[id] = this.createInitialPlanPayload(id);
+
+    // Calculate evolving state
+    this.recalculateEvolvingState(id);
+
+    this.persist();
+    return user;
+  }
+
+  public findUserByEmail(email: string): UserAccount | null {
+    const normalized = email.toLowerCase().trim();
+    for (const u of Object.values(this.users)) {
+      if (u.email.toLowerCase() === normalized) {
+        return { ...u };
+      }
+    }
+    return null;
+  }
+
+  public findUserById(id: string): UserAccount | null {
+    if (this.users[id]) {
+      return { ...this.users[id] };
+    }
+    return null;
+  }
+
+  public updateUser(id: string, updates: Partial<UserAccount>): UserAccount | null {
+    if (!this.users[id]) return null;
+    this.users[id] = {
+      ...this.users[id],
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+    if (updates.name && this.userProfiles[id]) {
+      this.userProfiles[id].name = updates.name;
+    }
+    this.persist();
+    return { ...this.users[id] };
+  }
+
+  // ==========================================
+  // USER PROFILE
+  // ==========================================
+
+  public getUserProfile(userId: string = 'user-001'): UserProfile {
+    if (!this.userProfiles[userId]) {
+      // Fallback: If user exists, create standard profile
+      const user = this.users[userId];
+      this.userProfiles[userId] = {
+        id: userId,
+        name: user ? user.name : 'HealthPilot User',
+        age: 30,
+        gender: 'Not specified',
+        heightCm: 175,
+        weightKg: 70,
+        bmi: 22.9,
+        fitnessLevel: 'intermediate',
+        healthConditions: [],
+        fitnessGoals: ['Consistency', 'Cardiovascular endurance'],
+        nutritionGoals: ['Hydration (2L/day)'],
+        activityPreferences: ['Zone 2 Running', 'Mobility yoga'],
+        preferredWorkoutTypes: ['Home functional fitness'],
+        preferredEnvironment: 'home',
+        availableEquipment: ['Yoga mat']
+      };
+      this.persist();
+    }
+    return { ...this.userProfiles[userId] };
+  }
+
+  public updateUserProfile(arg1: string | Partial<UserProfile> = 'user-001', arg2?: Partial<UserProfile>): UserProfile {
+    const userId = typeof arg1 === 'string' ? arg1 : ((arg1 as any)?.id || 'user-001');
+    const updates = (typeof arg1 === 'string' ? arg2 : arg1) || {};
+    const current = this.getUserProfile(userId);
+    const weight = updates.weightKg ?? current.weightKg;
+    const height = updates.heightCm ?? current.heightCm;
+    const bmi = Number((weight / Math.pow(height / 100, 2)).toFixed(1));
+
+    const updated: UserProfile = {
+      ...current,
+      ...updates,
+      bmi
+    };
+
+    this.userProfiles[userId] = updated;
+
+    if (updates.name && this.users[userId]) {
+      this.users[userId].name = updates.name;
+      this.users[userId].updatedAt = new Date().toISOString();
+    }
+
+    this.persist();
+    return { ...updated };
+  }
+
+  // ==========================================
+  // RECOVERY & PHYSIOLOGICAL SYSTEM ESTIMATE
+  // ==========================================
+
   public calculateRecoveryEstimate(ctx: {
     sleepHours: number;
     sleepQuality?: number;
@@ -1057,19 +439,12 @@ class InMemoryHealthPilotDB {
     const stress = Math.max(1, Math.min(10, ctx.stressLevel));
     const soreness = Math.max(1, Math.min(10, ctx.sorenessLevel));
 
-    // Baseline sleep ratio against optimal adult baseline of 8.0 hours (capped at 100)
     const sleepRatio = Math.min(100, (sleepHours / 8.0) * 100);
-    // Quality multiplier scaling from 0.70 (very poor) to 1.15 (restorative)
     const qualityMultiplier = 0.70 + (quality / 10) * 0.45;
     const effectiveRest = sleepRatio * qualityMultiplier;
-
-    // Energy readiness score (10 to 100)
     const energyScore = energy * 10;
-
-    // Systemic load penalty from fatigue, stress, and muscular soreness
     const systemicPenalty = (fatigue * 4.2 + stress * 3.4 + soreness * 2.4);
 
-    // Composite heuristic: restorative factors minus acute strain factors
     const rawScore = Math.round(0.42 * effectiveRest + 0.38 * energyScore - 0.25 * systemicPenalty + 10);
     const score = Math.max(12, Math.min(98, rawScore));
 
@@ -1083,21 +458,177 @@ class InMemoryHealthPilotDB {
     return { score, status };
   }
 
-  /**
-   * Recalculates the Multi-Dimensional Evolving User State
-   * Synthesizes:
-   * A. Stable profile baseline
-   * B. Current daily context
-   * C. Behavioral momentum & adherence track
-   * D. Recent outcomes
-   * E. Current goals and conflict flags
-   */
-  public recalculateEvolvingState(): EvolvingUserState {
-    const ctx = this.dailyContext;
-    const outcomes = this.outcomes;
-    const goals = this.goals;
+  // ==========================================
+  // DAILY CONTEXT
+  // ==========================================
 
-    // Dimension 1: Physiological & Recovery Estimates
+  public getLatestDailyContext(userId: string = 'user-001'): DailyContext {
+    const history = this.getDailyContextHistory(userId);
+    if (history.length > 0) {
+      return { ...history[0] };
+    }
+    // Fallback if empty
+    const today = new Date().toISOString().split('T')[0];
+    const fallback: DailyContext = {
+      id: `ctx-${userId}-today`,
+      userId,
+      date: today,
+      sleepHours: 7.0,
+      sleepQuality: 7,
+      energyLevel: 6,
+      fatigueLevel: 5,
+      stressLevel: 4,
+      sorenessLevel: 2,
+      recoveryScore: 70,
+      recoveryStatus: 'good',
+      mood: 'balanced',
+      cognitiveLoad: 4,
+      availableMinutes: 30,
+      preferredTime: 'morning',
+      environment: 'home',
+      equipmentAvailable: ['Yoga mat'],
+      activityPreference: 'Mobility & Stretching',
+      hydrationLiters: 2.0,
+      notes: ''
+    };
+    this.dailyContextHistories[userId] = [fallback];
+    this.persist();
+    return fallback;
+  }
+
+  public getDailyContext(): DailyContext {
+    return this.getLatestDailyContext('user-001');
+  }
+
+  public getDailyContextHistory(userId: string = 'user-001'): DailyContext[] {
+    if (!this.dailyContextHistories[userId]) {
+      this.dailyContextHistories[userId] = [];
+    }
+    return [...this.dailyContextHistories[userId]];
+  }
+
+  public getDailyContextById(userId: string = 'user-001', id: string): DailyContext | null {
+    const history = this.getDailyContextHistory(userId);
+    const item = history.find(c => c.id === id || (c as any)._id === id);
+    return item ? { ...item } : null;
+  }
+
+  public saveDailyContext(arg1: string | Partial<DailyContext> = 'user-001', arg2?: Partial<DailyContext>): DailyContext {
+    const userId = typeof arg1 === 'string' ? arg1 : ((arg1 as any)?.userId || 'user-001');
+    const data = (typeof arg1 === 'string' ? arg2 : arg1) || {};
+    const todayDate = data.date || new Date().toISOString().split('T')[0];
+    const history = this.getDailyContextHistory(userId);
+    const existingIndex = history.findIndex(h => h.date === todayDate);
+
+    const baseRecord: DailyContext = existingIndex >= 0
+      ? history[existingIndex]
+      : (history[0] || {
+          id: `ctx-${userId}-${todayDate}`,
+          userId,
+          date: todayDate,
+          sleepHours: 7.0,
+          sleepQuality: 7,
+          energyLevel: 6,
+          fatigueLevel: 5,
+          stressLevel: 5,
+          sorenessLevel: 3,
+          recoveryScore: 68,
+          availableMinutes: 30,
+          environment: 'home',
+          equipmentAvailable: ['Yoga mat']
+        });
+
+    const sleepVal = Number(data.sleepHours ?? data.sleepDuration ?? baseRecord.sleepHours);
+    const qualityVal = Number(data.sleepQuality ?? baseRecord.sleepQuality ?? 6);
+    const energyVal = Number(data.energyLevel ?? data.energy ?? baseRecord.energyLevel);
+    const fatigueVal = Number(data.fatigueLevel ?? data.fatigue ?? baseRecord.fatigueLevel);
+    const stressVal = Number(data.stressLevel ?? data.stress ?? baseRecord.stressLevel);
+    const sorenessVal = Number(data.sorenessLevel ?? data.soreness ?? baseRecord.sorenessLevel);
+
+    const { score, status } = this.calculateRecoveryEstimate({
+      sleepHours: sleepVal,
+      sleepQuality: qualityVal,
+      energyLevel: energyVal,
+      fatigueLevel: fatigueVal,
+      stressLevel: stressVal,
+      sorenessLevel: sorenessVal
+    });
+
+    const savedRecord: DailyContext = {
+      ...baseRecord,
+      ...data,
+      id: baseRecord.id,
+      userId,
+      date: todayDate,
+      sleepHours: sleepVal,
+      sleepDuration: sleepVal,
+      sleepQuality: qualityVal,
+      energyLevel: energyVal,
+      energy: energyVal,
+      fatigueLevel: fatigueVal,
+      fatigue: fatigueVal,
+      stressLevel: stressVal,
+      stress: stressVal,
+      sorenessLevel: sorenessVal,
+      soreness: sorenessVal,
+      recoveryScore: score,
+      recoveryStatus: status,
+      availableMinutes: Number(data.availableMinutes ?? baseRecord.availableMinutes),
+      environment: data.environment ?? baseRecord.environment,
+      equipmentAvailable: data.equipmentAvailable ?? data.equipment ?? baseRecord.equipmentAvailable,
+      updatedAt: new Date().toISOString()
+    };
+
+    if (existingIndex >= 0) {
+      history[existingIndex] = savedRecord;
+    } else {
+      history.unshift(savedRecord);
+    }
+
+    this.dailyContextHistories[userId] = history;
+    this.recalculateEvolvingState(userId);
+    this.persist();
+
+    return { ...savedRecord };
+  }
+
+  public updateDailyContext(arg1: string | Partial<DailyContext> = 'user-001', arg2?: Partial<DailyContext>): DailyContext {
+    return this.saveDailyContext(arg1, arg2);
+  }
+
+  public updateDailyContextById(arg1: string, arg2: string | Partial<DailyContext>, arg3?: Partial<DailyContext>): DailyContext | null {
+    let userId = 'user-001';
+    let id = arg1;
+    let updates: Partial<DailyContext> = {};
+
+    if (typeof arg2 === 'string') {
+      userId = arg1;
+      id = arg2;
+      updates = arg3 || {};
+    } else {
+      userId = 'user-001';
+      id = arg1;
+      updates = arg2 || {};
+    }
+
+    const history = this.getDailyContextHistory(userId);
+    const idx = history.findIndex(h => h.id === id);
+    if (idx === -1) return null;
+
+    const base = history[idx];
+    const saved = this.saveDailyContext(userId, { ...base, ...updates });
+    return saved;
+  }
+
+  // ==========================================
+  // RECALCULATE EVOLVING USER STATE
+  // ==========================================
+
+  public recalculateEvolvingState(userId: string = 'user-001'): EvolvingUserState {
+    const ctx = this.getLatestDailyContext(userId);
+    const outcomes = this.getOutcomes(userId);
+    const goals = this.getGoals(userId);
+
     const { score: recoveryScore, status: recoveryLevel } = this.calculateRecoveryEstimate({
       sleepHours: ctx.sleepHours,
       sleepQuality: ctx.sleepQuality,
@@ -1108,57 +639,44 @@ class InMemoryHealthPilotDB {
     });
 
     const physicalStrainScore = Math.min(100, Math.round(ctx.fatigueLevel * 5.5 + ctx.sorenessLevel * 4.5));
-
-    // Dimension 2: Subjective Energy & Fatigue States
     const energyState: 'high' | 'moderate' | 'low' = ctx.energyLevel >= 7 ? 'high' : ctx.energyLevel <= 4 ? 'low' : 'moderate';
     const fatigueState: 'high' | 'moderate' | 'low' = ctx.fatigueLevel >= 7 ? 'high' : ctx.fatigueLevel <= 3 ? 'low' : 'moderate';
-
-    // Dimension 3: Psychological Stress & Cognitive Demand
     const stressState: 'high' | 'moderate' | 'low' = ctx.stressLevel >= 7 ? 'high' : ctx.stressLevel <= 3 ? 'low' : 'moderate';
     const cognitiveLoad = Math.min(100, Math.round(ctx.stressLevel * 8.5 + (ctx.cognitiveLoad ? ctx.cognitiveLoad * 4 : 12)));
 
-    // Dimension 4: Behavioral History & Momentum from Outcomes
-    const recentOutcomes = outcomes.slice(0, 10);
-    const completedCount = recentOutcomes.filter(o => o.outcomeStatus === 'completed').length;
-    const partialCount = recentOutcomes.filter(o => o.outcomeStatus === 'partially_completed').length;
-    const weeklyAdherenceRate = recentOutcomes.length > 0 
-      ? Math.round(((completedCount + 0.5 * partialCount) / recentOutcomes.length) * 1000) / 10
-      : 78.5;
+    // Behavioral momentum from outcomes
+    const recent = outcomes.slice(0, 10);
+    const completedCount = recent.filter(o => o.outcomeStatus === 'completed').length;
+    const partialCount = recent.filter(o => o.outcomeStatus === 'partially_completed').length;
+    const skippedCount = recent.filter(o => o.outcomeStatus === 'skipped').length;
+    const adherenceRate = recent.length > 0 ? Math.round(((completedCount + 0.5 * partialCount) / recent.length) * 100) : 75;
 
-    let momentum = this.evolvingState?.behavioralMomentum ?? 74;
-    if (completedCount >= 4) {
-      momentum = Math.min(96, momentum + 2);
+    let momentumScore = 65;
+    if (recent.length > 0) {
+      momentumScore = Math.max(15, Math.min(95, Math.round(adherenceRate * 0.8 + (10 - ctx.fatigueLevel) * 2)));
     }
 
-    // Adaptation Status
+    let momentumLabel: 'Strong' | 'Moderate' | 'Low' = 'Moderate';
+    let momentumRationale = `Routine momentum (${momentumScore}/100) based on ${completedCount}/${recent.length} recent completions.`;
+    if (momentumScore >= 75) {
+      momentumLabel = 'Strong';
+      momentumRationale = `Strong follow-through momentum (${momentumScore}/100) across recent sessions.`;
+    } else if (momentumScore < 45) {
+      momentumLabel = 'Low';
+      momentumRationale = `Low adherence momentum (${momentumScore}/100) with recent skips.`;
+    }
+
     let adaptationStatus: 'primed' | 'steady' | 'fatigued' | 'overreaching' | 'recovery_needed' = 'steady';
-    if (recoveryScore < 48 || ctx.fatigueLevel >= 8) {
+    if (recoveryScore < 48 || ctx.fatigueLevel >= 7) {
       adaptationStatus = 'recovery_needed';
-    } else if (recoveryScore < 65 || ctx.fatigueLevel >= 6) {
-      adaptationStatus = 'fatigued';
-    } else if (recoveryScore >= 75 && ctx.energyLevel >= 7) {
+    } else if (momentumScore >= 75 && recoveryScore >= 75) {
       adaptationStatus = 'primed';
     }
 
-    // Dimension 5: Operational Availability & Environment
-    const availableMinutes = ctx.availableMinutes;
-    const currentEnvironment = ctx.environment;
-    const preferredTimeOfDay = ctx.preferredTime || 'morning';
-    const availableEquipmentCount = (ctx.equipmentAvailable || []).length;
-
-    // Dimension 6: Goal Priorities & Goal-Condition Awareness
     const primaryGoal = goals.find(g => g.priority === 'primary') || goals[0];
-    const activeConflicts = goals.filter(g => g.activeConflictFlag || g.status === 'needs_adaptation');
-    const hasGoalConflict = (recoveryScore < 50 || ctx.fatigueLevel >= 7) && primaryGoal?.category === 'endurance';
+    const hasGoalConflict = recoveryScore < 50 && primaryGoal?.category === 'endurance';
 
-    let goalConflictSummary = '';
-    if (hasGoalConflict) {
-      goalConflictSummary = `Acute physiological fatigue (${ctx.fatigueLevel}/10) and low recovery estimate (${recoveryScore}%) conflict with ${primaryGoal?.title || 'primary endurance goal'}.`;
-    }
-
-    const stateExplanation = `Today's recovery readiness is estimated at ${recoveryScore}% (${recoveryLevel.toUpperCase()}) with ${energyState.toUpperCase()} energy and ${stressState.toUpperCase()} stress. With ${availableMinutes} min available at ${currentEnvironment}, the decision model will prioritize ${adaptationStatus === 'recovery_needed' ? 'restorative autonomic down-regulation' : 'consistent habit execution'}.`;
-
-    this.evolvingState = {
+    const newState: EvolvingUserState = {
       recoveryReadiness: recoveryScore,
       recoveryLevel,
       physicalStrainScore,
@@ -1169,294 +687,359 @@ class InMemoryHealthPilotDB {
       stressState,
       stressLevel: ctx.stressLevel,
       cognitiveLoad,
-      behavioralMomentum: momentum,
-      weeklyAdherenceRate,
-      recentCompletionRatio: `${completedCount}/${recentOutcomes.length} completed`,
-      dominantBarrier: this.evolvingState?.dominantBarrier || 'Fatigue & Time Crunch',
+      behavioralMomentum: momentumScore,
+      behavioralMomentumLabel: momentumLabel,
+      behavioralMomentumRationale: momentumRationale,
+      weeklyAdherenceRate: adherenceRate,
+      recentCompletionRatio: `${completedCount}/${recent.length || 0} completed`,
+      dominantBarrier: skippedCount > 0 ? 'Schedule crunch & fatigue' : 'None reported',
       adaptationStatus,
-      availableMinutes,
-      currentEnvironment,
-      preferredTimeOfDay,
-      availableEquipmentCount,
-      primaryGoalTitle: primaryGoal ? primaryGoal.title : 'Sub-50:00 10K (Endurance)',
-      activeGoalConflictsCount: activeConflicts.length,
+      availableMinutes: ctx.availableMinutes,
+      currentEnvironment: ctx.environment,
+      preferredTimeOfDay: ctx.preferredTime || 'morning',
+      availableEquipmentCount: ctx.equipmentAvailable?.length || 1,
+      primaryGoalTitle: primaryGoal?.title || 'Habit Consistency',
+      activeGoalConflictsCount: hasGoalConflict ? 1 : 0,
       hasGoalConflict,
-      goalConflictSummary,
-      stateExplanation,
+      goalConflictSummary: hasGoalConflict
+        ? `Recovery readiness (${recoveryScore}%) conflicts with target intensity for ${primaryGoal?.title}.`
+        : undefined,
+      stateExplanation: `Recovery readiness is estimated at ${recoveryScore}% (${recoveryLevel?.toUpperCase()}) with ${ctx.availableMinutes}m available at ${ctx.environment}.`,
       isSystemEstimate: true,
       lastUpdated: new Date().toISOString()
     };
 
-    return { ...this.evolvingState };
+    this.evolvingStates[userId] = newState;
+    return { ...newState };
   }
 
-  public getDailyContext(): DailyContext {
-    return { ...this.dailyContext };
-  }
-
-  public getLatestDailyContext(): DailyContext {
-    return { ...this.dailyContext };
-  }
-
-  public getDailyContextHistory(): DailyContext[] {
-    return [...this.dailyContextHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }
-
-  public getDailyContextById(id: string): DailyContext | null {
-    const item = this.dailyContextHistory.find(c => c.id === id || c._id === id);
-    return item ? { ...item } : null;
-  }
-
-  public saveDailyContext(data: Partial<DailyContext>): DailyContext {
-    const targetDate = data.date || new Date().toISOString().split('T')[0];
-
-    // Compute recovery estimate
-    const sleep = data.sleepHours ?? data.sleepDuration ?? this.dailyContext.sleepHours;
-    const quality = data.sleepQuality ?? this.dailyContext.sleepQuality ?? 6;
-    const energy = data.energyLevel ?? data.energy ?? this.dailyContext.energyLevel;
-    const fatigue = data.fatigueLevel ?? data.fatigue ?? this.dailyContext.fatigueLevel;
-    const stress = data.stressLevel ?? data.stress ?? this.dailyContext.stressLevel;
-    const soreness = data.sorenessLevel ?? data.soreness ?? this.dailyContext.sorenessLevel;
-
-    const { score: recoveryScore, status: recoveryStatus } = this.calculateRecoveryEstimate({
-      sleepHours: sleep,
-      sleepQuality: quality,
-      energyLevel: energy,
-      fatigueLevel: fatigue,
-      stressLevel: stress,
-      sorenessLevel: soreness
-    });
-
-    const existingIndex = this.dailyContextHistory.findIndex(c => c.date === targetDate);
-
-    let savedRecord: DailyContext;
-
-    if (existingIndex >= 0) {
-      savedRecord = {
-        ...this.dailyContextHistory[existingIndex],
-        ...data,
-        date: targetDate,
-        sleepHours: sleep,
-        sleepDuration: sleep,
-        sleepQuality: quality,
-        energyLevel: energy,
-        energy,
-        fatigueLevel: fatigue,
-        fatigue,
-        stressLevel: stress,
-        stress,
-        sorenessLevel: soreness,
-        soreness,
-        recoveryScore,
-        recoveryStatus,
-        updatedAt: new Date().toISOString()
-      };
-      this.dailyContextHistory[existingIndex] = savedRecord;
-    } else {
-      savedRecord = {
-        id: `ctx-${Date.now()}`,
-        userId: 'user-001',
-        date: targetDate,
-        sleepHours: sleep,
-        sleepDuration: sleep,
-        sleepQuality: quality,
-        energyLevel: energy,
-        energy,
-        fatigueLevel: fatigue,
-        fatigue,
-        stressLevel: stress,
-        stress,
-        sorenessLevel: soreness,
-        soreness,
-        recoveryScore,
-        recoveryStatus,
-        mood: data.mood || 'good',
-        cognitiveLoad: data.cognitiveLoad || 5,
-        availableMinutes: data.availableMinutes ?? 30,
-        preferredTime: data.preferredTime || 'morning',
-        environment: data.environment || 'home',
-        equipmentAvailable: data.equipmentAvailable || data.equipment || ['Yoga mat'],
-        activityPreference: data.activityPreference || 'Functional Strength',
-        currentPreferences: data.currentPreferences || '',
-        currentPreferenceNote: data.currentPreferenceNote || '',
-        hydrationLiters: data.hydrationLiters ?? 1.5,
-        notes: data.notes || '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-      this.dailyContextHistory.unshift(savedRecord);
+  public getEvolvingState(userId: string = 'user-001'): EvolvingUserState {
+    if (!this.evolvingStates[userId]) {
+      return this.recalculateEvolvingState(userId);
     }
+    return { ...this.evolvingStates[userId] };
+  }
 
-    // If target date is today or latest, update this.dailyContext pointer
-    const todayStr = new Date().toISOString().split('T')[0];
-    if (targetDate === todayStr || existingIndex === 0 || this.dailyContextHistory[0].id === savedRecord.id) {
-      this.dailyContext = savedRecord;
-      this.recalculateEvolvingState();
+  // ==========================================
+  // OUTCOME JOURNAL & FEEDBACK LOOP
+  // ==========================================
+
+  public getOutcomes(userId: string = 'user-001'): RecommendationOutcome[] {
+    if (!this.outcomes[userId]) {
+      this.outcomes[userId] = [];
     }
-
-    return { ...savedRecord };
+    return [...this.outcomes[userId]];
   }
 
-  public updateDailyContext(updates: Partial<DailyContext>): DailyContext {
-    return this.saveDailyContext(updates);
-  }
+  public addOutcome(arg1: string | Omit<RecommendationOutcome, 'id' | 'timestamp'>, arg2?: Omit<RecommendationOutcome, 'id' | 'timestamp'>): RecommendationOutcome {
+    const userId = typeof arg1 === 'string' ? arg1 : 'user-001';
+    const outcomeData = (typeof arg1 === 'string' ? arg2 : arg1) as Omit<RecommendationOutcome, 'id' | 'timestamp'>;
 
-  public updateDailyContextById(id: string, updates: Partial<DailyContext>): DailyContext | null {
-    const idx = this.dailyContextHistory.findIndex(c => c.id === id || c._id === id);
-    if (idx === -1) return null;
-
-    const current = this.dailyContextHistory[idx];
-    const sleep = updates.sleepHours ?? updates.sleepDuration ?? current.sleepHours;
-    const quality = updates.sleepQuality ?? current.sleepQuality;
-    const energy = updates.energyLevel ?? updates.energy ?? current.energyLevel;
-    const fatigue = updates.fatigueLevel ?? updates.fatigue ?? current.fatigueLevel;
-    const stress = updates.stressLevel ?? updates.stress ?? current.stressLevel;
-    const soreness = updates.sorenessLevel ?? updates.soreness ?? current.sorenessLevel;
-
-    const { score: recoveryScore, status: recoveryStatus } = this.calculateRecoveryEstimate({
-      sleepHours: sleep,
-      sleepQuality: quality,
-      energyLevel: energy,
-      fatigueLevel: fatigue,
-      stressLevel: stress,
-      sorenessLevel: soreness
-    });
-
-    const updatedRecord: DailyContext = {
-      ...current,
-      ...updates,
-      sleepHours: sleep,
-      sleepDuration: sleep,
-      sleepQuality: quality,
-      energyLevel: energy,
-      energy,
-      fatigueLevel: fatigue,
-      fatigue,
-      stressLevel: stress,
-      stress,
-      sorenessLevel: soreness,
-      soreness,
-      recoveryScore,
-      recoveryStatus,
-      updatedAt: new Date().toISOString()
-    };
-
-    this.dailyContextHistory[idx] = updatedRecord;
-
-    // If updated record is the current active daily context, sync
-    if (this.dailyContext.id === id || this.dailyContext.date === updatedRecord.date) {
-      this.dailyContext = updatedRecord;
-      this.recalculateEvolvingState();
-    }
-
-    return { ...updatedRecord };
-  }
-
-  public getEvolvingState(): EvolvingUserState {
-    return { ...this.evolvingState };
-  }
-
-  public getOutcomes(): RecommendationOutcome[] {
-    return [...this.outcomes];
-  }
-
-  public addOutcome(outcomeData: Omit<RecommendationOutcome, 'id' | 'timestamp'>): RecommendationOutcome {
     const newOutcome: RecommendationOutcome = {
       ...outcomeData,
       id: `out-${Date.now()}`,
       timestamp: new Date().toISOString()
     };
-    this.outcomes.unshift(newOutcome);
 
-    // Continuous feedback loop: update prediction ledger actual outcome
-    const predMatch = this.predictionRecords.find(p => p.recommendationId === outcomeData.recommendationId)
-      || this.predictionRecords.find(p => !p.actualOutcomeStatus);
+    if (!this.outcomes[userId]) this.outcomes[userId] = [];
+    this.outcomes[userId].unshift(newOutcome);
+
+    // Update prediction records if matching
+    const preds = this.getPredictionRecords(userId);
+    const predMatch = preds.find(p => p.recommendationId === outcomeData.recommendationId) || preds.find(p => !p.actualOutcomeStatus);
     if (predMatch) {
       predMatch.actualOutcomeStatus = outcomeData.outcomeStatus;
       predMatch.actualDurationMinutes = outcomeData.actualDurationMinutes;
     }
 
-    // Continuous feedback loop: update state and behavioral momentum
-    this.updateStateFromOutcome(newOutcome);
+    // Feedback Loop: Adapt plan based on empirical evidence
+    this.recalculateEvolvingState(userId);
 
+    // Adapt plan in adaptivePlanEngine
+    adaptivePlanEngine.recordOutcomeInPlan(newOutcome);
+    adaptivePlanEngine.evaluateAndAdaptPlan(
+      this.getEvolvingState(userId),
+      this.getOutcomes(userId),
+      this.getUserProfile(userId),
+      this.getPersonalBehavioralProfile(userId),
+      this.getGoals(userId)
+    );
+    const updatedPlan = adaptivePlanEngine.getPlanPayload(
+      this.getEvolvingState(userId),
+      this.getOutcomes(userId)
+    );
+    this.adaptivePlans[userId] = updatedPlan;
+
+    this.persist();
     return newOutcome;
   }
 
-  private updateStateFromOutcome(outcome: RecommendationOutcome) {
-    const recent = this.outcomes.slice(0, 10);
-    const completedCount = recent.filter(o => o.outcomeStatus === 'completed').length;
-    const partialCount = recent.filter(o => o.outcomeStatus === 'partially_completed').length;
-    const skippedCount = recent.filter(o => o.outcomeStatus === 'skipped').length;
-    const rate = Math.round(((completedCount + 0.5 * partialCount) / recent.length) * 100);
+  // ==========================================
+  // GOALS & STRATEGY
+  // ==========================================
 
-    this.evolvingState.weeklyAdherenceRate = rate;
-    this.evolvingState.recentCompletionRatio = `${completedCount} of ${recent.length} completed`;
-    
-    if (outcome.outcomeStatus === 'completed') {
-      this.evolvingState.behavioralMomentum = Math.min(100, this.evolvingState.behavioralMomentum + 4);
-    } else if (outcome.outcomeStatus === 'partially_completed') {
-      this.evolvingState.behavioralMomentum = Math.max(15, this.evolvingState.behavioralMomentum - 2);
-      if (outcome.reasonForSkipOrPartial) {
-        this.evolvingState.dominantBarrier = outcome.reasonForSkipOrPartial.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-      }
-    } else if (outcome.outcomeStatus === 'skipped') {
-      this.evolvingState.behavioralMomentum = Math.max(15, this.evolvingState.behavioralMomentum - 6);
-      if (outcome.reasonForSkipOrPartial) {
-        this.evolvingState.dominantBarrier = outcome.reasonForSkipOrPartial.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
-      }
+  public getGoals(userId: string = 'user-001'): GoalStrategyItem[] {
+    if (!this.goals[userId]) {
+      this.goals[userId] = [];
     }
+    return [...this.goals[userId]];
+  }
 
-    const momentumScore = this.evolvingState.behavioralMomentum;
-    if (momentumScore >= 75) {
-      this.evolvingState.behavioralMomentumLabel = 'Strong';
-      this.evolvingState.behavioralMomentumRationale = `Strong follow-through momentum (${momentumScore}/100) across recent sessions (${completedCount}/${recent.length} completed). Target progressive volume is well tolerated.`;
-    } else if (momentumScore >= 45) {
-      this.evolvingState.behavioralMomentumLabel = 'Moderate';
-      this.evolvingState.behavioralMomentumRationale = `Steady routine momentum (${momentumScore}/100). Periodic schedule compressions or fatigue spikes observed; moderate adaptations preserve consistency.`;
+  public updateGoal(arg1: string, arg2: string | Partial<GoalStrategyItem>, arg3?: Partial<GoalStrategyItem>): GoalStrategyItem | null {
+    let userId = 'user-001';
+    let id = arg1;
+    let updates: Partial<GoalStrategyItem> = {};
+
+    if (typeof arg2 === 'string') {
+      userId = arg1;
+      id = arg2;
+      updates = arg3 || {};
     } else {
-      this.evolvingState.behavioralMomentumLabel = 'Low';
-      this.evolvingState.behavioralMomentumRationale = `Low adherence momentum (${momentumScore}/100) with recent session skips (${skippedCount} skipped). Shorter duration or lower intensity down-regulation recommended.`;
+      userId = 'user-001';
+      id = arg1;
+      updates = arg2 || {};
     }
 
-    // Adaptation status
-    if (this.evolvingState.recoveryReadiness < 50 || (this.evolvingState.fatigueLevel ?? 5) >= 7) {
-      this.evolvingState.adaptationStatus = 'recovery_needed';
-    } else if (momentumScore >= 75 && this.evolvingState.recoveryReadiness >= 75) {
-      this.evolvingState.adaptationStatus = 'primed';
-    } else {
-      this.evolvingState.adaptationStatus = 'steady';
-    }
+    const goals = this.getGoals(userId);
+    const idx = goals.findIndex(g => g.id === id);
+    if (idx === -1) return null;
 
-    this.evolvingState.lastUpdated = new Date().toISOString();
-
-    // Feedback Loop: Adapt plan based on empirical evidence
-    adaptivePlanEngine.recordOutcomeInPlan(outcome);
-    adaptivePlanEngine.evaluateAndAdaptPlan(
-      this.evolvingState,
-      this.outcomes,
-      this.userProfile,
-      this.getPersonalBehavioralProfile(),
-      this.goals
-    );
+    goals[idx] = { ...goals[idx], ...updates };
+    this.goals[userId] = goals;
+    this.persist();
+    return { ...goals[idx] };
   }
 
   // ==========================================
-  // ADHERENCE PREDICTION & ML MODEL METHODS
+  // ADAPTIVE PLAN
+  // ==========================================
+
+  public getAdaptivePlan(userId: string = 'user-001'): AdaptivePlanDay[] {
+    return this.getAdaptivePlanPayload(userId).days;
+  }
+
+  public getAdaptivePlanPayload(userId: string = 'user-001'): AdaptivePlanPayload {
+    if (!this.adaptivePlans[userId]) {
+      this.adaptivePlans[userId] = this.createInitialPlanPayload(userId);
+      this.persist();
+    }
+    return { ...this.adaptivePlans[userId] };
+  }
+
+  public rebalanceAdaptivePlan(userId: string = 'user-001'): AdaptivePlanPayload {
+    adaptivePlanEngine.evaluateAndAdaptPlan(
+      this.getEvolvingState(userId),
+      this.getOutcomes(userId),
+      this.getUserProfile(userId),
+      this.getPersonalBehavioralProfile(userId),
+      this.getGoals(userId)
+    );
+    const adapted = adaptivePlanEngine.getPlanPayload(
+      this.getEvolvingState(userId),
+      this.getOutcomes(userId)
+    );
+    this.adaptivePlans[userId] = adapted;
+    this.persist();
+    return adapted;
+  }
+
+  public resetAdaptivePlan(userId: string = 'user-001'): AdaptivePlanPayload {
+    adaptivePlanEngine.resetToBaseline();
+    const reset = adaptivePlanEngine.getPlanPayload(
+      this.getEvolvingState(userId),
+      this.getOutcomes(userId)
+    );
+    this.adaptivePlans[userId] = reset;
+    this.persist();
+    return reset;
+  }
+
+  public getAdaptationHistory(userId: string = 'user-001'): PlanAdaptationEvent[] {
+    return this.getAdaptivePlanPayload(userId).adaptationEvents || [];
+  }
+
+  private createInitialPlanPayload(userId: string): AdaptivePlanPayload {
+    const days: AdaptivePlanDay[] = [
+      {
+        id: `plan-${userId}-1`,
+        dayOfWeek: 'Monday',
+        dayName: 'Monday',
+        date: 'Today',
+        title: '20-Min Restorative Spinal Mobility & Breathwork',
+        plannedSession: '20-Min Restorative Spinal Mobility & Breathwork',
+        category: 'recovery',
+        durationMinutes: 20,
+        intensity: 'low',
+        isAdaptiveAdapted: false,
+        status: 'scheduled'
+      },
+      {
+        id: `plan-${userId}-2`,
+        dayOfWeek: 'Tuesday',
+        dayName: 'Tuesday',
+        date: 'Tomorrow',
+        title: '25-Min Home Dumbbell Functional Strength',
+        plannedSession: '25-Min Home Dumbbell Functional Strength',
+        category: 'workout',
+        durationMinutes: 25,
+        intensity: 'moderate',
+        isAdaptiveAdapted: false,
+        status: 'scheduled'
+      },
+      {
+        id: `plan-${userId}-3`,
+        dayOfWeek: 'Wednesday',
+        dayName: 'Wednesday',
+        date: 'In 2 days',
+        title: '30-Min Aerobic Zone 2 Cardio Flow',
+        plannedSession: '30-Min Aerobic Zone 2 Cardio Flow',
+        category: 'workout',
+        durationMinutes: 30,
+        intensity: 'moderate',
+        isAdaptiveAdapted: false,
+        status: 'scheduled'
+      },
+      {
+        id: `plan-${userId}-4`,
+        dayOfWeek: 'Thursday',
+        dayName: 'Thursday',
+        date: 'In 3 days',
+        title: 'Active Rest & Parasympathetic Walk',
+        plannedSession: 'Active Rest & Parasympathetic Walk',
+        category: 'active_rest',
+        durationMinutes: 25,
+        intensity: 'low',
+        isAdaptiveAdapted: false,
+        status: 'scheduled'
+      },
+      {
+        id: `plan-${userId}-5`,
+        dayOfWeek: 'Friday',
+        dayName: 'Friday',
+        date: 'In 4 days',
+        title: 'Threshold Interval Circuit (HIIT)',
+        plannedSession: 'Threshold Interval Circuit (HIIT)',
+        category: 'workout',
+        durationMinutes: 30,
+        intensity: 'high',
+        isAdaptiveAdapted: false,
+        status: 'scheduled'
+      },
+      {
+        id: `plan-${userId}-6`,
+        dayOfWeek: 'Saturday',
+        dayName: 'Saturday',
+        date: 'In 5 days',
+        title: 'Full Body Functional Mobility & Core',
+        plannedSession: 'Full Body Functional Mobility & Core',
+        category: 'workout',
+        durationMinutes: 30,
+        intensity: 'moderate',
+        isAdaptiveAdapted: false,
+        status: 'scheduled'
+      },
+      {
+        id: `plan-${userId}-7`,
+        dayOfWeek: 'Sunday',
+        dayName: 'Sunday',
+        date: 'In 6 days',
+        title: 'Deload & Deep Tissue Recovery Flow',
+        plannedSession: 'Deload & Deep Tissue Recovery Flow',
+        category: 'recovery',
+        durationMinutes: 30,
+        intensity: 'low',
+        isAdaptiveAdapted: false,
+        status: 'scheduled'
+      }
+    ];
+
+    return {
+      days,
+      baselineDays: [...days],
+      activeAdaptationsCount: 0,
+      lastRebalancedAt: new Date().toISOString(),
+      momentumStatus: 'Moderate',
+      momentumScore: 65,
+      adaptationEvents: [],
+      dataSufficiency: 'insufficient',
+      dataSufficiencyNotice: 'Initial baseline plan awaiting longitudinal outcomes.'
+    };
+  }
+
+  // ==========================================
+  // RECOMMENDATION HISTORY
+  // ==========================================
+
+  public getRecommendationHistory(userId: string = 'user-001'): RecommendationHistoryItem[] {
+    if (!this.recommendationHistories[userId]) {
+      this.recommendationHistories[userId] = [];
+    }
+    return [...this.recommendationHistories[userId]];
+  }
+
+  public recordRecommendationHistory(arg1: string | Omit<RecommendationHistoryItem, 'id'> = 'user-001', arg2?: Omit<RecommendationHistoryItem, 'id'>): RecommendationHistoryItem {
+    const userId = typeof arg1 === 'string' ? arg1 : ((arg1 as any)?.userId || 'user-001');
+    const item = (typeof arg1 === 'string' ? arg2 : arg1) as Omit<RecommendationHistoryItem, 'id'>;
+
+    const record: RecommendationHistoryItem = {
+      ...item,
+      id: `rec-hist-${Date.now()}`
+    };
+    if (!this.recommendationHistories[userId]) this.recommendationHistories[userId] = [];
+    this.recommendationHistories[userId].unshift(record);
+    this.persist();
+    return record;
+  }
+
+  // ==========================================
+  // WHAT-IF SCENARIOS
+  // ==========================================
+
+  public getWhatIfScenarios(userId: string = 'user-001'): WhatIfScenarioRecord[] {
+    if (!this.whatIfScenarios[userId]) {
+      this.whatIfScenarios[userId] = [];
+    }
+    return [...this.whatIfScenarios[userId]];
+  }
+
+  public recordWhatIfScenario(arg1: string | Omit<WhatIfScenarioRecord, 'id' | 'timestamp'> = 'user-001', arg2?: Omit<WhatIfScenarioRecord, 'id' | 'timestamp'>): WhatIfScenarioRecord {
+    const userId = typeof arg1 === 'string' ? arg1 : ((arg1 as any)?.userId || 'user-001');
+    const record = (typeof arg1 === 'string' ? arg2 : arg1) as Omit<WhatIfScenarioRecord, 'id' | 'timestamp'>;
+
+    const scenario: WhatIfScenarioRecord = {
+      ...record,
+      id: `whatif-${Date.now()}`,
+      timestamp: new Date().toISOString()
+    };
+    if (!this.whatIfScenarios[userId]) this.whatIfScenarios[userId] = [];
+    this.whatIfScenarios[userId].unshift(scenario);
+    this.persist();
+    return scenario;
+  }
+
+  // ==========================================
+  // PREDICTIONS & ML METADATA
   // ==========================================
 
   public getPredictionRecords(userId: string = 'user-001'): AdherencePredictionRecord[] {
-    return [...this.predictionRecords];
+    if (!this.predictionRecords[userId]) {
+      this.predictionRecords[userId] = [];
+    }
+    return [...this.predictionRecords[userId]];
   }
 
-  public addPredictionRecord(
-    rec: Omit<AdherencePredictionRecord, 'id' | 'predictionTimestamp'>
-  ): AdherencePredictionRecord {
+  public addPredictionRecord(arg1: string | Omit<AdherencePredictionRecord, 'id' | 'predictionTimestamp'> = 'user-001', arg2?: Omit<AdherencePredictionRecord, 'id' | 'predictionTimestamp'>): AdherencePredictionRecord {
+    const userId = typeof arg1 === 'string' ? arg1 : ((arg1 as any)?.userId || 'user-001');
+    const rec = (typeof arg1 === 'string' ? arg2 : arg1) as Omit<AdherencePredictionRecord, 'id' | 'predictionTimestamp'>;
+
     const newRecord: AdherencePredictionRecord = {
       ...rec,
       id: `pred-${Date.now()}`,
       predictionTimestamp: new Date().toISOString()
     };
-    this.predictionRecords.unshift(newRecord);
+    if (!this.predictionRecords[userId]) this.predictionRecords[userId] = [];
+    this.predictionRecords[userId].unshift(newRecord);
+    this.persist();
     return newRecord;
   }
 
@@ -1466,85 +1049,19 @@ class InMemoryHealthPilotDB {
 
   public setMLModelMetadata(metadata: MLModelMetadata): void {
     this.activeMLModelMetadata = { ...metadata };
+    this.persist();
   }
 
-  public getGoals(): GoalStrategyItem[] {
-    return [...this.goals];
-  }
+  // ==========================================
+  // BEHAVIORAL PATTERN ANALYSIS ENGINE
+  // ==========================================
 
-  public updateGoal(id: string, updates: Partial<GoalStrategyItem>): GoalStrategyItem | null {
-    const idx = this.goals.findIndex(g => g.id === id);
-    if (idx === -1) return null;
-    this.goals[idx] = { ...this.goals[idx], ...updates };
-    return { ...this.goals[idx] };
-  }
-
-  public getAdaptivePlan(): AdaptivePlanDay[] {
-    return adaptivePlanEngine.getDays();
-  }
-
-  public getAdaptivePlanPayload(): AdaptivePlanPayload {
-    return adaptivePlanEngine.getPlanPayload(this.evolvingState, this.outcomes);
-  }
-
-  public rebalanceAdaptivePlan(): AdaptivePlanPayload {
-    adaptivePlanEngine.evaluateAndAdaptPlan(
-      this.evolvingState,
-      this.outcomes,
-      this.userProfile,
-      this.getPersonalBehavioralProfile(),
-      this.goals
-    );
-    return adaptivePlanEngine.getPlanPayload(this.evolvingState, this.outcomes);
-  }
-
-  public resetAdaptivePlan(): AdaptivePlanPayload {
-    return adaptivePlanEngine.resetToBaseline();
-  }
-
-  public getAdaptationHistory(): PlanAdaptationEvent[] {
-    return adaptivePlanEngine.getAdaptationEvents();
-  }
-
-  public getRecommendationHistory(): RecommendationHistoryItem[] {
-    return [...this.recommendationHistory];
-  }
-
-  public recordRecommendationHistory(item: Omit<RecommendationHistoryItem, 'id'>): RecommendationHistoryItem {
-    const record: RecommendationHistoryItem = {
-      ...item,
-      id: `rec-hist-${Date.now()}`
-    };
-    this.recommendationHistory.unshift(record);
-    return record;
-  }
-
-  public getWhatIfScenarios(): WhatIfScenarioRecord[] {
-    return [...this.whatIfScenarios];
-  }
-
-  public recordWhatIfScenario(record: Omit<WhatIfScenarioRecord, 'id' | 'timestamp'>): WhatIfScenarioRecord {
-    const scenario: WhatIfScenarioRecord = {
-      ...record,
-      id: `whatif-${Date.now()}`,
-      timestamp: new Date().toISOString()
-    };
-    this.whatIfScenarios.unshift(scenario);
-    return scenario;
-  }
-
-  /**
-   * Empirical Behavioral Pattern Analysis Engine
-   * Derives real descriptive statistics, duration ranges, environment rates,
-   * condition associations, barrier distributions, and Personal Behavioral Profile.
-   * STRICTLY NO HARDCODED OR FAKE INSIGHTS.
-   */
-  public calculateBehavioralAnalysis(): {
+  public calculateBehavioralAnalysis(userId: string = 'user-001'): {
     summary: BehaviorPatternSummary;
     profile: PersonalBehavioralProfile;
     patterns: BehavioralPatternsData;
   } {
-    const outcomes = this.outcomes;
+    const outcomes = this.getOutcomes(userId);
     const total = outcomes.length;
     const completed = outcomes.filter(o => o.outcomeStatus === 'completed').length;
     const partial = outcomes.filter(o => o.outcomeStatus === 'partially_completed').length;
@@ -1563,7 +1080,7 @@ class InMemoryHealthPilotDB {
       ? Math.round(outcomes.reduce((sum, o) => sum + (o.plannedDurationMinutes || 0), 0) / total)
       : 0;
 
-    // 1. DURATION PATTERNS (0-15m, 16-30m, 31-45m, 46+m)
+    // Duration buckets
     const durationBuckets: Array<{ range: string; min: number; max: number }> = [
       { range: '0–15m', min: 0, max: 15 },
       { range: '16–30m', min: 16, max: 30 },
@@ -1588,13 +1105,12 @@ class InMemoryHealthPilotDB {
       };
     });
 
-    // Determine highest adherence duration range (min 1 sample)
     const activeDurations = durationPatterns.filter(d => d.total > 0);
     const bestDurationBucket = activeDurations.length > 0
       ? [...activeDurations].sort((a, b) => b.completionRate - a.completionRate || b.total - a.total)[0]
       : null;
 
-    // 2. ENVIRONMENT PATTERNS
+    // Environment patterns
     const envKeys: Array<{ key: 'home' | 'gym' | 'outdoor' | 'other'; label: string }> = [
       { key: 'home', label: 'Home' },
       { key: 'gym', label: 'Gym' },
@@ -1631,7 +1147,7 @@ class InMemoryHealthPilotDB {
       ? [...activeEnvs].sort((a, b) => b.completionRate - a.completionRate || b.total - a.total)[0]
       : null;
 
-    // 3. ACTIVITY TYPE PATTERNS
+    // Activity types
     const activityMap: Record<string, { total: number; completed: number; partial: number; skipped: number }> = {};
     for (const o of outcomes) {
       let actType = 'Functional Strength';
@@ -1672,7 +1188,7 @@ class InMemoryHealthPilotDB {
     const skippedSorted = [...activityPatterns].filter(a => a.skipped > 0).sort((a, b) => b.skipped - a.skipped);
     const mostSkippedActivity = skippedSorted.length > 0 ? skippedSorted[0].activityType : 'None recorded';
 
-    // 4. TIME OF DAY PATTERNS
+    // Time of day
     const timeBuckets: Record<'morning' | 'afternoon' | 'evening', { total: number; completed: number }> = {
       morning: { total: 0, completed: 0 },
       afternoon: { total: 0, completed: 0 },
@@ -1698,7 +1214,7 @@ class InMemoryHealthPilotDB {
 
     const bestTimeOfDay = [...timeOfDayPatterns].filter(t => t.total > 0).sort((a, b) => b.completionRate - a.completionRate || b.total - a.total)[0]?.label || 'Morning';
 
-    // 5. BARRIER ANALYSIS
+    // Barriers
     const barrierCounts: Record<string, number> = {};
     for (const o of outcomes) {
       if (o.reasonForSkipOrPartial) {
@@ -1715,26 +1231,22 @@ class InMemoryHealthPilotDB {
 
     const dominantBarrier = commonBarriers[0]?.label || (total >= 3 ? 'None reported' : 'Collecting data');
 
-    // 6. CONDITION-BASED ASSOCIATIONS (Non-causal empirical comparisons)
-    // Energy
+    // Conditions
     const highEnergy = outcomes.filter(o => (o.contextSnapshot?.energyLevel ?? 5) >= 7);
     const lowEnergy = outcomes.filter(o => (o.contextSnapshot?.energyLevel ?? 5) <= 4);
     const highEnergyRate = highEnergy.length ? Math.round((highEnergy.filter(o => o.outcomeStatus === 'completed').length / highEnergy.length) * 100) : 0;
     const lowEnergyRate = lowEnergy.length ? Math.round((lowEnergy.filter(o => o.outcomeStatus === 'completed').length / lowEnergy.length) * 100) : 0;
 
-    // Fatigue
     const lowFatigue = outcomes.filter(o => (o.contextSnapshot?.fatigueLevel ?? 5) <= 4);
     const highFatigue = outcomes.filter(o => (o.contextSnapshot?.fatigueLevel ?? 5) >= 7);
     const lowFatigueRate = lowFatigue.length ? Math.round((lowFatigue.filter(o => o.outcomeStatus === 'completed').length / lowFatigue.length) * 100) : 0;
     const highFatigueRate = highFatigue.length ? Math.round((highFatigue.filter(o => o.outcomeStatus === 'completed').length / highFatigue.length) * 100) : 0;
 
-    // Sleep
     const goodSleep = outcomes.filter(o => (o.contextSnapshot?.sleepHours ?? 7) >= 7.0);
     const shortSleep = outcomes.filter(o => (o.contextSnapshot?.sleepHours ?? 7) < 6.0);
     const goodSleepRate = goodSleep.length ? Math.round((goodSleep.filter(o => o.outcomeStatus === 'completed').length / goodSleep.length) * 100) : 0;
     const shortSleepRate = shortSleep.length ? Math.round((shortSleep.filter(o => o.outcomeStatus === 'completed').length / shortSleep.length) * 100) : 0;
 
-    // Available Time
     const longTime = outcomes.filter(o => (o.contextSnapshot?.availableMinutes ?? 30) >= 35);
     const shortTime = outcomes.filter(o => (o.contextSnapshot?.availableMinutes ?? 30) < 25);
     const longTimeRate = longTime.length ? Math.round((longTime.filter(o => o.outcomeStatus === 'completed').length / longTime.length) * 100) : 0;
@@ -1783,7 +1295,6 @@ class InMemoryHealthPilotDB {
       }
     ];
 
-    // 7. DATA SUFFICIENCY & CONFIDENCE
     let dataSufficiency: 'insufficient' | 'preliminary' | 'moderate' | 'high' = 'insufficient';
     let dataSufficiencyText = 'Not enough history yet to establish a reliable pattern. Complete a few activities to unlock personalized behavioral insights.';
     if (total >= 15) {
@@ -1797,7 +1308,6 @@ class InMemoryHealthPilotDB {
       dataSufficiencyText = `Based on ${total} recorded outcomes (Preliminary evidence). More data will increase pattern reliability.`;
     }
 
-    // 8. LEARNED INSIGHTS & KEY OBSERVATION (Grounded in real metrics)
     const learnedInsights: string[] = [];
     let keyObservation = '';
 
@@ -1805,92 +1315,40 @@ class InMemoryHealthPilotDB {
       learnedInsights.push('We are still learning your behavior. Complete a few activities to unlock personalized behavioral insights.');
       keyObservation = 'HealthPilot AI is currently gathering baseline outcome data. Log daily outcomes to reveal personalized behavioral patterns.';
     } else {
-      // Real Duration Insight
       if (bestDurationBucket && activeDurations.length > 1) {
-        const longerBuckets = activeDurations.filter(d => d.minMinutes >= 31);
-        const avgLongerRate = longerBuckets.length > 0
-          ? Math.round(longerBuckets.reduce((acc, d) => acc + d.completionRate, 0) / longerBuckets.length)
-          : null;
-        if (avgLongerRate !== null && bestDurationBucket.completionRate > avgLongerRate) {
-          learnedInsights.push(`Your completion rate is higher for ${bestDurationBucket.range} sessions (${bestDurationBucket.completionRate}%) than for sessions longer than 30 minutes (${avgLongerRate}%).`);
-        } else {
-          learnedInsights.push(`Your highest follow-through occurs in the ${bestDurationBucket.range} duration window with a ${bestDurationBucket.completionRate}% completion rate.`);
-        }
+        learnedInsights.push(`Highest follow-through occurs in the ${bestDurationBucket.range} duration window with a ${bestDurationBucket.completionRate}% completion rate.`);
       }
-
-      // Real Environment Insight
-      if (bestEnv && activeEnvs.length > 1) {
-        const otherEnv = activeEnvs.find(e => e.environment !== bestEnv.environment);
-        if (otherEnv) {
-          learnedInsights.push(`Your history indicates higher follow-through for ${bestEnv.label}-based activities (${bestEnv.completionRate}%) compared to ${otherEnv.label} (${otherEnv.completionRate}%).`);
-        } else {
-          learnedInsights.push(`Your recent completion rate is highest for ${bestEnv.label}-based activities at ${bestEnv.completionRate}%.`);
-        }
+      if (bestEnv) {
+        learnedInsights.push(`Completion rate is highest for ${bestEnv.label}-based activities at ${bestEnv.completionRate}%.`);
       }
-
-      // Real Barrier / Condition Insight
       if (commonBarriers.length > 0) {
-        learnedInsights.push(`${commonBarriers[0].label} is currently your most frequent reported barrier, accounting for ${commonBarriers[0].percentage}% of non-completed sessions.`);
+        learnedInsights.push(`${commonBarriers[0].label} is currently your most frequent reported barrier (${commonBarriers[0].percentage}% of non-completed sessions).`);
       }
-
-      // Real Energy / Fatigue Association Insight
-      if (highFatigue.length > 0 && highFatigueRate < 50) {
-        learnedInsights.push(`When systemic fatigue is high (≥7), session follow-through drops to ${highFatigueRate}%, suggesting adaptive duration down-regulation is indicated.`);
-      }
-
-      // Key Observation
-      const envText = bestEnv ? `${bestEnv.label.toLowerCase()}` : 'home';
-      const durText = bestDurationBucket ? bestDurationBucket.range : '20–30 minute';
-      keyObservation = `Your completion rate is highest (${bestDurationBucket ? bestDurationBucket.completionRate : completionRateOverall}%) for ${durText} ${envText} sessions. When fatigue is elevated, shorter restorative sessions preserve behavioral consistency.`;
+      keyObservation = `Your completion rate is highest (${bestDurationBucket ? bestDurationBucket.completionRate : completionRateOverall}%) for ${bestDurationBucket ? bestDurationBucket.range : '20–30 minute'} sessions.`;
     }
 
-    // 9. STRONGEST & WEAK ADHERENCE CONDITIONS
     const strongestAdherenceConditions: string[] = [];
     const weakAdherenceConditions: string[] = [];
 
-    if (total < 3) {
-      strongestAdherenceConditions.push('Pending baseline activity tracking');
-      weakAdherenceConditions.push('Pending baseline activity tracking');
-    } else {
-      if (bestDurationBucket) {
-        strongestAdherenceConditions.push(`Sessions bounded within ${bestDurationBucket.range} (${bestDurationBucket.completionRate}% completion)`);
-      }
-      if (bestEnv) {
-        strongestAdherenceConditions.push(`${bestEnv.label} environment with low logistical friction (${bestEnv.completionRate}% completion)`);
-      }
-      if (goodSleep.length > 0) {
-        strongestAdherenceConditions.push(`Restorative sleep (≥7.0h) with moderate daily energy (${goodSleepRate}% follow-through)`);
-      }
-      if (timeBuckets.morning.total > 0 && timeBuckets.morning.completed > 0) {
-        strongestAdherenceConditions.push('Morning or afternoon windows before late-day cognitive fatigue');
-      }
+    if (total >= 3) {
+      if (completionRateHome >= 75) strongestAdherenceConditions.push(`Home environment (${completionRateHome}% completion)`);
+      if (goodSleepRate >= 75) strongestAdherenceConditions.push(`Restorative sleep (≥7.0h: ${goodSleepRate}% completion)`);
+      if (highEnergyRate >= 75) strongestAdherenceConditions.push(`High energy readiness (${highEnergyRate}% completion)`);
 
-      if (gymPattern && gymPattern.total > 0 && gymPattern.completionRate < 50) {
-        weakAdherenceConditions.push(`Gym workouts requiring transit during high fatigue (${gymPattern.completionRate}% completion)`);
-      }
-      const longSessions = outcomes.filter(o => o.plannedDurationMinutes >= 40);
-      if (longSessions.length > 0) {
-        const longCompRate = Math.round((longSessions.filter(o => o.outcomeStatus === 'completed').length / longSessions.length) * 100);
-        weakAdherenceConditions.push(`Sessions scheduled longer than 40 minutes on high stress days (${longCompRate}% completion)`);
-      }
-      if (shortSleep.length > 0 && shortSleepRate < 50) {
-        weakAdherenceConditions.push(`High intensity prescribed following sub-6 hour sleep debt (${shortSleepRate}% completion)`);
-      }
-      if (commonBarriers.length > 0) {
-        weakAdherenceConditions.push(`Unbuffered schedules where "${commonBarriers[0].label}" precipitates session truncation`);
-      }
+      if (highFatigueRate > 0 && highFatigueRate < 50) weakAdherenceConditions.push(`High acute fatigue (≥7: ${highFatigueRate}% completion)`);
+      if (shortSleepRate > 0 && shortSleepRate < 50) weakAdherenceConditions.push(`Short sleep (<6.0h: ${shortSleepRate}% completion)`);
+      if (completionRateGym > 0 && completionRateGym < 60) weakAdherenceConditions.push(`Gym workouts (${completionRateGym}% completion)`);
     }
 
-    const preferredDurationStr = bestDurationBucket ? `${bestDurationBucket.minMinutes}–${bestDurationBucket.maxMinutes} minutes` : '20–30 minutes';
     const preferredEnvStr = bestEnv ? bestEnv.label : 'Home';
 
     const profile: PersonalBehavioralProfile = {
-      userId: 'user-001',
+      userId,
       calculatedAt: new Date().toISOString(),
       observationCount: total,
       dataSufficiency,
       dataSufficiencyText,
-      preferredDuration: preferredDurationStr,
+      preferredDuration: bestDurationBucket ? bestDurationBucket.range : '20–30 min',
       preferredEnvironment: preferredEnvStr,
       preferredActivity: highestAdherenceActivity,
       preferredTime: bestTimeOfDay,
@@ -1944,29 +1402,332 @@ class InMemoryHealthPilotDB {
     return { summary, profile, patterns };
   }
 
-  public getBehaviorPatternSummary(): BehaviorPatternSummary {
-    return this.calculateBehavioralAnalysis().summary;
+  public getBehaviorPatternSummary(userId: string = 'user-001'): BehaviorPatternSummary {
+    return this.calculateBehavioralAnalysis(userId).summary;
   }
 
-  public getPersonalBehavioralProfile(): PersonalBehavioralProfile {
-    return this.calculateBehavioralAnalysis().profile;
+  public getPersonalBehavioralProfile(userId: string = 'user-001'): PersonalBehavioralProfile {
+    return this.calculateBehavioralAnalysis(userId).profile;
   }
 
-  public getBehavioralPatterns(): BehavioralPatternsData {
-    return this.calculateBehavioralAnalysis().patterns;
+  public getBehavioralPatterns(userId: string = 'user-001'): BehavioralPatternsData {
+    return this.calculateBehavioralAnalysis(userId).patterns;
   }
 
-  public recalculateBehavioralProfile(): {
-    summary: BehaviorPatternSummary;
-    profile: PersonalBehavioralProfile;
-    patterns: BehavioralPatternsData;
-  } {
-    const analysis = this.calculateBehavioralAnalysis();
-    this.evolvingState.weeklyAdherenceRate = analysis.profile.overallRecentAdherence;
-    this.evolvingState.dominantBarrier = analysis.profile.dominantBarrier;
-    this.evolvingState.lastUpdated = new Date().toISOString();
+  public recalculateBehavioralProfile(userId: string = 'user-001') {
+    const analysis = this.calculateBehavioralAnalysis(userId);
+    const state = this.getEvolvingState(userId);
+    state.weeklyAdherenceRate = analysis.profile.overallRecentAdherence;
+    state.dominantBarrier = analysis.profile.dominantBarrier;
+    state.lastUpdated = new Date().toISOString();
+    this.evolvingStates[userId] = state;
+    this.persist();
     return analysis;
+  }
+
+  // ==========================================
+  // BENCHMARK SEED DATA INITIALIZER (RESEARCH INTEGRITY)
+  // ==========================================
+
+  private seedBenchmarkData(): void {
+    const defaultPasswordHash = bcrypt.hashSync('password123', 10);
+
+    // Seed research user: Alex Vance
+    this.users['user-001'] = {
+      id: 'user-001',
+      email: 'alex.vance@example.com',
+      passwordHash: defaultPasswordHash,
+      name: 'Alex Vance',
+      role: 'research_participant',
+      timezone: 'UTC',
+      onboardingComplete: true,
+      createdAt: '2026-09-01T08:00:00.000Z',
+      updatedAt: '2026-09-01T08:00:00.000Z'
+    };
+
+    this.userProfiles['user-001'] = {
+      id: 'user-001',
+      name: 'Alex Vance',
+      age: 32,
+      gender: 'Non-binary',
+      heightCm: 175,
+      weightKg: 71.5,
+      bmi: 23.3,
+      fitnessLevel: 'intermediate',
+      healthConditions: ['Mild lower back tightness after prolonged desk sitting'],
+      fitnessGoals: [
+        'Improve cardiovascular endurance (10k preparation)',
+        'Maintain posterior chain & core strength',
+        'Optimize sleep architecture and stress resilience'
+      ],
+      nutritionGoals: [
+        'Consistent hydration (min 2.5L/day)',
+        'Adequate protein distribution (~1.6g/kg)',
+        'Pre-workout complex carbs'
+      ],
+      activityPreferences: ['Zone 2 Running', 'Bodyweight HIIT', 'Kettlebell flows', 'Mobility yoga'],
+      preferredWorkoutTypes: ['Home functional fitness', 'Short interval training', 'Low-impact active recovery'],
+      preferredEnvironment: 'home',
+      availableEquipment: ['Adjustable dumbbells', 'Pull-up bar', 'Resistance bands', 'Yoga mat', 'Foam roller']
+    };
+
+    // 14 Dated context records for Alex Vance
+    this.dailyContextHistories['user-001'] = [
+      {
+        id: 'ctx-today',
+        userId: 'user-001',
+        date: new Date().toISOString().split('T')[0],
+        sleepHours: 5.8,
+        sleepDuration: 5.8,
+        sleepQuality: 5,
+        energyLevel: 5,
+        energy: 5,
+        fatigueLevel: 7,
+        fatigue: 7,
+        stressLevel: 6,
+        stress: 6,
+        sorenessLevel: 6,
+        soreness: 6,
+        recoveryScore: 48,
+        recoveryStatus: 'low',
+        mood: 'fatigued',
+        cognitiveLoad: 7,
+        availableMinutes: 30,
+        preferredTime: 'morning',
+        environment: 'home',
+        equipmentAvailable: ['Adjustable dumbbells', 'Resistance bands', 'Yoga mat'],
+        activityPreference: 'Mobility & Stretching',
+        currentPreferences: 'Prefer gentle mobility and light tempo, feel tight from yesterday desk work',
+        hydrationLiters: 1.2,
+        notes: 'Slightly fragmented sleep due to late work deadline.',
+        createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: 'ctx-yesterday',
+        userId: 'user-001',
+        date: '2026-09-06',
+        sleepHours: 7.2,
+        sleepDuration: 7.2,
+        sleepQuality: 7,
+        energyLevel: 7,
+        energy: 7,
+        fatigueLevel: 4,
+        fatigue: 4,
+        stressLevel: 4,
+        stress: 4,
+        sorenessLevel: 4,
+        soreness: 4,
+        recoveryScore: 78,
+        recoveryStatus: 'good',
+        mood: 'good',
+        cognitiveLoad: 4,
+        availableMinutes: 40,
+        preferredTime: 'morning',
+        environment: 'home',
+        equipmentAvailable: ['Adjustable dumbbells', 'Resistance bands', 'Pull-up bar', 'Yoga mat'],
+        activityPreference: 'Functional Strength',
+        currentPreferences: 'Feeling balanced, ready for posterior chain strength tempo.',
+        hydrationLiters: 2.4,
+        notes: 'Slept soundly, morning energy was prompt.',
+        createdAt: '2026-09-06T07:15:00.000Z',
+        updatedAt: '2026-09-06T07:15:00.000Z'
+      },
+      {
+        id: 'ctx-d2',
+        userId: 'user-001',
+        date: '2026-09-05',
+        sleepHours: 7.5,
+        sleepDuration: 7.5,
+        sleepQuality: 8,
+        energyLevel: 8,
+        energy: 8,
+        fatigueLevel: 3,
+        fatigue: 3,
+        stressLevel: 3,
+        stress: 3,
+        sorenessLevel: 2,
+        soreness: 2,
+        recoveryScore: 84,
+        recoveryStatus: 'good',
+        mood: 'great',
+        cognitiveLoad: 3,
+        availableMinutes: 50,
+        preferredTime: 'morning',
+        environment: 'outdoor',
+        equipmentAvailable: ['Running shoes', 'Foam roller'],
+        activityPreference: 'Aerobic Cardio',
+        currentPreferences: 'Clear head, comfortable morning air.',
+        hydrationLiters: 2.6,
+        notes: 'Steady aerobic tempo.',
+        createdAt: '2026-09-05T06:45:00.000Z',
+        updatedAt: '2026-09-05T06:45:00.000Z'
+      },
+      {
+        id: 'ctx-d3',
+        userId: 'user-001',
+        date: '2026-09-04',
+        sleepHours: 6.2,
+        sleepDuration: 6.2,
+        sleepQuality: 6,
+        energyLevel: 5,
+        energy: 5,
+        fatigueLevel: 6,
+        fatigue: 6,
+        stressLevel: 7,
+        stress: 7,
+        sorenessLevel: 5,
+        soreness: 5,
+        recoveryScore: 56,
+        recoveryStatus: 'moderate',
+        mood: 'fatigued',
+        cognitiveLoad: 7,
+        availableMinutes: 25,
+        preferredTime: 'evening',
+        environment: 'gym',
+        equipmentAvailable: ['Full commercial gym'],
+        activityPreference: 'Functional Strength',
+        currentPreferences: 'High work pressure, tight timebox.',
+        hydrationLiters: 1.8,
+        notes: 'Felt pressed for time.',
+        createdAt: '2026-09-04T18:30:00.000Z',
+        updatedAt: '2026-09-04T18:30:00.000Z'
+      },
+      {
+        id: 'ctx-d4',
+        userId: 'user-001',
+        date: '2026-09-03',
+        sleepHours: 7.0,
+        sleepDuration: 7.0,
+        sleepQuality: 7,
+        energyLevel: 6,
+        energy: 6,
+        fatigueLevel: 5,
+        fatigue: 5,
+        stressLevel: 5,
+        stress: 5,
+        sorenessLevel: 4,
+        soreness: 4,
+        recoveryScore: 71,
+        recoveryStatus: 'good',
+        mood: 'balanced',
+        cognitiveLoad: 5,
+        availableMinutes: 35,
+        preferredTime: 'morning',
+        environment: 'home',
+        equipmentAvailable: ['Adjustable dumbbells', 'Yoga mat'],
+        activityPreference: 'Mobility & Stretching',
+        currentPreferences: 'Slight hamstring tightness.',
+        hydrationLiters: 2.2,
+        notes: 'Good home session.',
+        createdAt: '2026-09-03T07:00:00.000Z',
+        updatedAt: '2026-09-03T07:00:00.000Z'
+      }
+    ];
+
+    // Seed goals for Alex Vance
+    this.goals['user-001'] = [
+      {
+        id: 'goal-1',
+        title: 'Cardiovascular Aerobic Base (10K sub-50 min)',
+        category: 'endurance',
+        targetDate: '2026-11-15',
+        timeframe: '8 Weeks Remaining',
+        targetValue: 'Sub-50:00 10K',
+        currentValue: '54:20 Pace',
+        currentProgress: 68,
+        priority: 'primary',
+        status: 'on_track',
+        conflictStatus: 'transient_conflict',
+        activeConflictFlag: true,
+        conflictNote: 'Scheduled threshold intervals conflict with acute fatigue (7/10) and low sleep (5.8h).',
+        strategyAdjustment: 'Down-regulate to 20-min gentle mobility today; move threshold intervals to Wednesday when recovery score recovers ≥70%.',
+        milestones: [
+          { id: 'm1', title: 'Complete 3 weekly Zone 2 aerobic sessions', completed: true },
+          { id: 'm2', title: 'Achieve 8km continuous run at <145 bpm', completed: true },
+          { id: 'm3', title: 'Break 25:00 in 5K time trial benchmark', completed: false }
+        ]
+      },
+      {
+        id: 'goal-2',
+        title: 'Posterior Chain & Core Stability',
+        category: 'strength',
+        targetDate: '2026-12-01',
+        timeframe: '10 Weeks Remaining',
+        targetValue: '3x10 RDL @ 40kg with neutral spine',
+        currentValue: '3x10 @ 32kg',
+        currentProgress: 75,
+        priority: 'secondary',
+        status: 'on_track',
+        conflictStatus: 'none',
+        activeConflictFlag: false,
+        strategyAdjustment: 'Maintain progressive dumbbell loading during high recovery days (Recovery Score ≥ 70%).'
+      },
+      {
+        id: 'goal-3',
+        title: 'Sleep Architecture & Autonomic Balance',
+        category: 'sleep',
+        targetDate: '2026-10-30',
+        timeframe: '6 Weeks Remaining',
+        targetValue: 'Average 7.5h sleep with >80% recovery score',
+        currentValue: '6.8h avg (7-day)',
+        currentProgress: 52,
+        priority: 'supporting',
+        status: 'on_track',
+        conflictStatus: 'none',
+        activeConflictFlag: false,
+        strategyAdjustment: 'Prioritize evening parasympathetic breathwork and wind-down mobility on work-compressed days.'
+      }
+    ];
+
+    // Benchmark 14 Outcomes for Alex Vance
+    this.outcomes['user-001'] = [
+      { id: 'out-14', recommendationId: 'rec-14', recommendedActivity: '30-Min Zone 2 Jog', category: 'workout', plannedDurationMinutes: 30, intensity: 'moderate', contextSnapshot: { sleepHours: 7.2, energyLevel: 7, fatigueLevel: 3, stressLevel: 4, availableMinutes: 45, environment: 'outdoor' }, outcomeStatus: 'completed', actualDurationMinutes: 32, userFeedback: 'Felt very smooth, breathing stayed steady.', perceivedEffort: 5, timestamp: new Date(Date.now() - 86400000 * 1).toISOString() },
+      { id: 'out-13', recommendationId: 'rec-13', recommendedActivity: '45-Min Heavy Gym Strength', category: 'workout', plannedDurationMinutes: 45, intensity: 'high', contextSnapshot: { sleepHours: 5.5, energyLevel: 4, fatigueLevel: 8, stressLevel: 7, availableMinutes: 50, environment: 'gym' }, outcomeStatus: 'skipped', actualDurationMinutes: 0, reasonForSkipOrPartial: 'too_tired', userFeedback: 'Zero energy after poor sleep, went straight to sleep.', perceivedEffort: 0, timestamp: new Date(Date.now() - 86400000 * 2).toISOString() },
+      { id: 'out-12', recommendationId: 'rec-12', recommendedActivity: '20-Min Home Mobility Flow', category: 'recovery', plannedDurationMinutes: 20, intensity: 'low', contextSnapshot: { sleepHours: 6.0, energyLevel: 5, fatigueLevel: 7, stressLevel: 6, availableMinutes: 30, environment: 'home' }, outcomeStatus: 'completed', actualDurationMinutes: 20, userFeedback: 'Great relief on hips and lower back.', perceivedEffort: 3, timestamp: new Date(Date.now() - 86400000 * 3).toISOString() },
+      { id: 'out-11', recommendationId: 'rec-11', recommendedActivity: '35-Min Home Dumbbell Strength', category: 'workout', plannedDurationMinutes: 35, intensity: 'moderate', contextSnapshot: { sleepHours: 7.5, energyLevel: 8, fatigueLevel: 3, stressLevel: 3, availableMinutes: 45, environment: 'home' }, outcomeStatus: 'completed', actualDurationMinutes: 35, userFeedback: 'Solid session, weights felt manageable.', perceivedEffort: 6, timestamp: new Date(Date.now() - 86400000 * 4).toISOString() },
+      { id: 'out-10', recommendationId: 'rec-10', recommendedActivity: '25-Min HIIT Interval Sprints', category: 'workout', plannedDurationMinutes: 25, intensity: 'high', contextSnapshot: { sleepHours: 6.5, energyLevel: 6, fatigueLevel: 5, stressLevel: 8, availableMinutes: 30, environment: 'home' }, outcomeStatus: 'partially_completed', actualDurationMinutes: 15, reasonForSkipOrPartial: 'no_time', userFeedback: 'Cut short by incoming meeting call.', perceivedEffort: 7, timestamp: new Date(Date.now() - 86400000 * 5).toISOString() },
+      { id: 'out-9', recommendationId: 'rec-9', recommendedActivity: '40-Min Outdoor Trail Run', category: 'workout', plannedDurationMinutes: 40, intensity: 'moderate', contextSnapshot: { sleepHours: 8.0, energyLevel: 9, fatigueLevel: 2, stressLevel: 2, availableMinutes: 60, environment: 'outdoor' }, outcomeStatus: 'completed', actualDurationMinutes: 42, userFeedback: 'Excellent pace, sunny morning.', perceivedEffort: 6, timestamp: new Date(Date.now() - 86400000 * 6).toISOString() },
+      { id: 'out-8', recommendationId: 'rec-8', recommendedActivity: '30-Min Gym Machine Circuit', category: 'workout', plannedDurationMinutes: 30, intensity: 'moderate', contextSnapshot: { sleepHours: 6.8, energyLevel: 6, fatigueLevel: 5, stressLevel: 5, availableMinutes: 40, environment: 'gym' }, outcomeStatus: 'completed', actualDurationMinutes: 30, userFeedback: 'Crowded gym but got it done.', perceivedEffort: 5, timestamp: new Date(Date.now() - 86400000 * 7).toISOString() },
+      { id: 'out-7', recommendationId: 'rec-7', recommendedActivity: '15-Min Thoracic & Foam Rolling', category: 'recovery', plannedDurationMinutes: 15, intensity: 'low', contextSnapshot: { sleepHours: 5.8, energyLevel: 4, fatigueLevel: 7, stressLevel: 7, availableMinutes: 20, environment: 'home' }, outcomeStatus: 'completed', actualDurationMinutes: 18, userFeedback: 'Felt looser afterward.', perceivedEffort: 2, timestamp: new Date(Date.now() - 86400000 * 8).toISOString() },
+      { id: 'out-6', recommendationId: 'rec-6', recommendedActivity: '45-Min Heavy Lower Body Gym', category: 'workout', plannedDurationMinutes: 45, intensity: 'high', contextSnapshot: { sleepHours: 6.2, energyLevel: 5, fatigueLevel: 6, stressLevel: 6, availableMinutes: 35, environment: 'gym' }, outcomeStatus: 'partially_completed', actualDurationMinutes: 25, reasonForSkipOrPartial: 'no_time', userFeedback: 'No time for cooldown, had to rush.', perceivedEffort: 8, timestamp: new Date(Date.now() - 86400000 * 9).toISOString() },
+      { id: 'out-5', recommendationId: 'rec-5', recommendedActivity: '30-Min Kettlebell Home Circuit', category: 'workout', plannedDurationMinutes: 30, intensity: 'moderate', contextSnapshot: { sleepHours: 7.4, energyLevel: 7, fatigueLevel: 4, stressLevel: 4, availableMinutes: 40, environment: 'home' }, outcomeStatus: 'completed', actualDurationMinutes: 30, userFeedback: 'Clean rhythm and good sweating.', perceivedEffort: 6, timestamp: new Date(Date.now() - 86400000 * 10).toISOString() },
+      { id: 'out-4', recommendationId: 'rec-4', recommendedActivity: '45-Min Outdoor Tempo Run', category: 'workout', plannedDurationMinutes: 45, intensity: 'high', contextSnapshot: { sleepHours: 5.2, energyLevel: 3, fatigueLevel: 8, stressLevel: 7, availableMinutes: 60, environment: 'outdoor' }, outcomeStatus: 'skipped', actualDurationMinutes: 0, reasonForSkipOrPartial: 'too_tired', userFeedback: 'Severe fatigue, felt lightheaded, rested instead.', perceivedEffort: 0, timestamp: new Date(Date.now() - 86400000 * 11).toISOString() },
+      { id: 'out-3', recommendationId: 'rec-3', recommendedActivity: '20-Min Bedtime Yin Yoga', category: 'recovery', plannedDurationMinutes: 20, intensity: 'low', contextSnapshot: { sleepHours: 6.5, energyLevel: 5, fatigueLevel: 6, stressLevel: 6, availableMinutes: 25, environment: 'home' }, outcomeStatus: 'completed', actualDurationMinutes: 22, userFeedback: 'Helped slow racing thoughts before bed.', perceivedEffort: 2, timestamp: new Date(Date.now() - 86400000 * 12).toISOString() },
+      { id: 'out-2', recommendationId: 'rec-2', recommendedActivity: '35-Min Bodyweight HIIT Flow', category: 'workout', plannedDurationMinutes: 35, intensity: 'high', contextSnapshot: { sleepHours: 7.6, energyLevel: 8, fatigueLevel: 3, stressLevel: 3, availableMinutes: 45, environment: 'home' }, outcomeStatus: 'completed', actualDurationMinutes: 35, userFeedback: 'Heart rate spiked well, felt energized after.', perceivedEffort: 7, timestamp: new Date(Date.now() - 86400000 * 13).toISOString() },
+      { id: 'out-1', recommendationId: 'rec-1', recommendedActivity: '25-Min Posture Alignment Walk', category: 'recovery', plannedDurationMinutes: 25, intensity: 'low', contextSnapshot: { sleepHours: 6.9, energyLevel: 6, fatigueLevel: 5, stressLevel: 5, availableMinutes: 30, environment: 'outdoor' }, outcomeStatus: 'completed', actualDurationMinutes: 25, userFeedback: 'Easy walking in afternoon sun.', perceivedEffort: 3, timestamp: new Date(Date.now() - 86400000 * 14).toISOString() }
+    ];
+
+    // Seed prediction records for Alex Vance
+    this.predictionRecords['user-001'] = [
+      { id: 'pred-14', userId: 'user-001', recommendationId: 'rec-14', recommendationTitle: '30-Min Zone 2 Jog', predictionProbability: 0.88, predictedAdherence: 88, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 7.2, energyLevel: 7, fatigueLevel: 3, stressLevel: 4, availableMinutes: 45, environment: 'outdoor' }, predictionTimestamp: new Date(Date.now() - 86400000 * 1).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 32 },
+      { id: 'pred-13', userId: 'user-001', recommendationId: 'rec-13', recommendationTitle: '45-Min Heavy Gym Strength', predictionProbability: 0.35, predictedAdherence: 35, predictedClass: 0, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 5.5, energyLevel: 4, fatigueLevel: 8, stressLevel: 7, availableMinutes: 50, environment: 'gym' }, predictionTimestamp: new Date(Date.now() - 86400000 * 2).toISOString(), actualOutcomeStatus: 'skipped', actualDurationMinutes: 0 },
+      { id: 'pred-12', userId: 'user-001', recommendationId: 'rec-12', recommendationTitle: '20-Min Home Mobility Flow', predictionProbability: 0.92, predictedAdherence: 92, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 6.0, energyLevel: 5, fatigueLevel: 7, stressLevel: 6, availableMinutes: 30, environment: 'home' }, predictionTimestamp: new Date(Date.now() - 86400000 * 3).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 20 },
+      { id: 'pred-11', userId: 'user-001', recommendationId: 'rec-11', recommendationTitle: '35-Min Home Dumbbell Strength', predictionProbability: 0.85, predictedAdherence: 85, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 7.5, energyLevel: 8, fatigueLevel: 3, stressLevel: 3, availableMinutes: 45, environment: 'home' }, predictionTimestamp: new Date(Date.now() - 86400000 * 4).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 35 },
+      { id: 'pred-10', userId: 'user-001', recommendationId: 'rec-10', recommendationTitle: '25-Min HIIT Interval Sprints', predictionProbability: 0.62, predictedAdherence: 62, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 6.5, energyLevel: 6, fatigueLevel: 5, stressLevel: 8, availableMinutes: 30, environment: 'home' }, predictionTimestamp: new Date(Date.now() - 86400000 * 5).toISOString(), actualOutcomeStatus: 'partially_completed', actualDurationMinutes: 15 },
+      { id: 'pred-9', userId: 'user-001', recommendationId: 'rec-9', recommendationTitle: '40-Min Outdoor Trail Run', predictionProbability: 0.90, predictedAdherence: 90, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 8.0, energyLevel: 9, fatigueLevel: 2, stressLevel: 2, availableMinutes: 60, environment: 'outdoor' }, predictionTimestamp: new Date(Date.now() - 86400000 * 6).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 42 },
+      { id: 'pred-8', userId: 'user-001', recommendationId: 'rec-8', recommendationTitle: '30-Min Gym Machine Circuit', predictionProbability: 0.74, predictedAdherence: 74, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 6.8, energyLevel: 6, fatigueLevel: 5, stressLevel: 5, availableMinutes: 40, environment: 'gym' }, predictionTimestamp: new Date(Date.now() - 86400000 * 7).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 30 },
+      { id: 'pred-7', userId: 'user-001', recommendationId: 'rec-7', recommendationTitle: '15-Min Thoracic & Foam Rolling', predictionProbability: 0.88, predictedAdherence: 88, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 5.8, energyLevel: 4, fatigueLevel: 7, stressLevel: 7, availableMinutes: 20, environment: 'home' }, predictionTimestamp: new Date(Date.now() - 86400000 * 8).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 18 },
+      { id: 'pred-6', userId: 'user-001', recommendationId: 'rec-6', recommendationTitle: '45-Min Heavy Lower Body Gym', predictionProbability: 0.52, predictedAdherence: 52, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 6.2, energyLevel: 5, fatigueLevel: 6, stressLevel: 6, availableMinutes: 35, environment: 'gym' }, predictionTimestamp: new Date(Date.now() - 86400000 * 9).toISOString(), actualOutcomeStatus: 'partially_completed', actualDurationMinutes: 25 },
+      { id: 'pred-5', userId: 'user-001', recommendationId: 'rec-5', recommendationTitle: '30-Min Kettlebell Home Circuit', predictionProbability: 0.82, predictedAdherence: 82, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 7.4, energyLevel: 7, fatigueLevel: 4, stressLevel: 4, availableMinutes: 40, environment: 'home' }, predictionTimestamp: new Date(Date.now() - 86400000 * 10).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 30 },
+      { id: 'pred-4', userId: 'user-001', recommendationId: 'rec-4', recommendationTitle: '45-Min Outdoor Tempo Run', predictionProbability: 0.40, predictedAdherence: 40, predictedClass: 0, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 5.2, energyLevel: 3, fatigueLevel: 8, stressLevel: 7, availableMinutes: 60, environment: 'outdoor' }, predictionTimestamp: new Date(Date.now() - 86400000 * 11).toISOString(), actualOutcomeStatus: 'skipped', actualDurationMinutes: 0 },
+      { id: 'pred-3', userId: 'user-001', recommendationId: 'rec-3', recommendationTitle: '20-Min Bedtime Yin Yoga', predictionProbability: 0.94, predictedAdherence: 94, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 6.5, energyLevel: 5, fatigueLevel: 6, stressLevel: 6, availableMinutes: 25, environment: 'home' }, predictionTimestamp: new Date(Date.now() - 86400000 * 12).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 22 },
+      { id: 'pred-2', userId: 'user-001', recommendationId: 'rec-2', recommendationTitle: '35-Min Bodyweight HIIT Flow', predictionProbability: 0.86, predictedAdherence: 86, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 7.6, energyLevel: 8, fatigueLevel: 3, stressLevel: 3, availableMinutes: 45, environment: 'home' }, predictionTimestamp: new Date(Date.now() - 86400000 * 13).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 35 },
+      { id: 'pred-1', userId: 'user-001', recommendationId: 'rec-1', recommendationTitle: '25-Min Posture Alignment Walk', predictionProbability: 0.91, predictedAdherence: 91, predictedClass: 1, modelName: 'Logistic Regression', modelVersion: '1.0.0-prototype', isBaselineFallback: false, dataSourceLabel: 'Seed / Demonstration Data', featureSnapshot: { sleepHours: 6.9, energyLevel: 6, fatigueLevel: 5, stressLevel: 5, availableMinutes: 30, environment: 'outdoor' }, predictionTimestamp: new Date(Date.now() - 86400000 * 14).toISOString(), actualOutcomeStatus: 'completed', actualDurationMinutes: 25 }
+    ];
+
+    // Seed recommendation history for Alex Vance
+    this.recommendationHistories['user-001'] = [
+      { id: 'rec-hist-1', userId: 'user-001', recommendationId: 'rec-14', title: '30-Min Zone 2 Jog', category: 'workout', durationMinutes: 30, intensity: 'moderate', environment: 'outdoor', contextSnapshot: { sleepHours: 7.2, energyLevel: 7, fatigueLevel: 3, stressLevel: 4, availableMinutes: 45, environment: 'outdoor' }, predictedAdherence: 88, suitabilityScore: 84, status: 'Completed (32m)', whyRecommended: 'Cardiovascular aerobic base development in sunny weather.', outcome: { outcomeStatus: 'completed', actualDurationMinutes: 32, userFeedback: 'Felt very smooth, breathing stayed steady.' }, timestamp: new Date(Date.now() - 86400000 * 1).toISOString() },
+      { id: 'rec-hist-2', userId: 'user-001', recommendationId: 'rec-13', title: '45-Min Heavy Gym Strength', category: 'workout', durationMinutes: 45, intensity: 'high', environment: 'gym', contextSnapshot: { sleepHours: 5.5, energyLevel: 4, fatigueLevel: 8, stressLevel: 7, availableMinutes: 50, environment: 'gym' }, predictedAdherence: 35, suitabilityScore: 40, status: 'Skipped (Too Tired)', whyRecommended: 'Original hypertrophy day before sleep deficit occurred.', outcome: { outcomeStatus: 'skipped', actualDurationMinutes: 0, userFeedback: 'Zero energy after poor sleep, went straight to sleep.' }, adaptationApplied: 'Shifted high-intensity stimulus to next week.', timestamp: new Date(Date.now() - 86400000 * 2).toISOString() }
+    ];
+
+    // Seed adaptive plan for Alex Vance
+    this.adaptivePlans['user-001'] = this.createInitialPlanPayload('user-001');
+
+    // Recalculate evolving state
+    this.recalculateEvolvingState('user-001');
   }
 }
 
-export const db = new InMemoryHealthPilotDB();
+export const db = new PersistentHealthPilotDB();

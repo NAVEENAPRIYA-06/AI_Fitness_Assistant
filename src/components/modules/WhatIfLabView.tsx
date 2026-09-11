@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useHealthPilot } from '../../context/HealthPilotContext.js';
 import { WhatIfScenarioResult, WhatIfCandidateItem, SensitivityDataPoint } from '../../types/index.js';
+import { Accordion } from '../common/Accordion.js';
 import {
   FlaskConical,
   Sparkles,
@@ -780,295 +781,248 @@ export const WhatIfLabView: React.FC = () => {
                 </div>
               )}
 
-              {/* FIVE-FACTOR DECISION INTELLIGENCE COMPARISON */}
-              {result.fiveFactorComparison && (
-                <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-                        <Scale className="w-4 h-4 text-indigo-400" />
-                        <span>Five-Factor Decision Comparison</span>
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Evaluates changes across HealthPilot's multi-objective decision scoring architecture
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
-                      Standard Fixed Weights
-                    </span>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    {result.fiveFactorComparison.map((factor, idx) => (
-                      <div
-                        key={idx}
-                        className="p-3 rounded-lg bg-slate-900/50 border border-slate-800/90 text-xs space-y-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-200">{factor.factor}</span>
-                            <span className="text-[10px] font-mono text-slate-400 px-1.5 py-0.5 rounded bg-slate-800">
-                              {factor.weightPercent} Wt
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 font-mono">
-                            <span className="text-slate-400">Current: {factor.currentScore}%</span>
-                            <span className="text-white font-bold">What-If: {factor.whatIfScore}%</span>
-                            <span className={`font-bold ${factor.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                              {factor.delta >= 0 ? `+${factor.delta}%` : `${factor.delta}%`}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Dual score bar comparison */}
-                        <div className="space-y-1">
-                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-slate-500 rounded-full"
-                              style={{ width: `${factor.currentScore}%` }}
-                              title={`Current: ${factor.currentScore}%`}
-                            />
-                          </div>
-                          <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-emerald-500 rounded-full"
-                              style={{ width: `${factor.whatIfScore}%` }}
-                              title={`What-If: ${factor.whatIfScore}%`}
-                            />
-                          </div>
-                        </div>
-
-                        <p className="text-[11px] text-slate-400 leading-relaxed pt-0.5">
-                          {factor.reason}
-                        </p>
-                      </div>
-                    ))}
+              {/* 4. DETAILED IMPACT BREAKDOWN (COLLAPSIBLE) */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between px-1">
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                      Detailed Impact Breakdown
+                    </h4>
+                    <p className="text-[11px] text-slate-400">
+                      Multi-objective decision matrix, SHAP drivers, candidate ranking, and audit data
+                    </p>
                   </div>
                 </div>
-              )}
 
-              {/* SHAP COMPARISON */}
-              {result.shapComparison && (
-                <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-                        <span>SHAP-Based Model Explanation</span>
-                        <span
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
-                            result.shapComparison.isGenuineShap
-                              ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                              : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                          }`}
-                        >
-                          {result.shapComparison.isGenuineShap ? 'Genuine SHAP (Active)' : 'System Fallback'}
-                        </span>
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Current top adherence contributors vs. What-If counterfactual drivers
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-mono text-slate-500">
-                      Base Log-Odds: {result.shapComparison.baseValue}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* CURRENT SHAP */}
-                    <div className="p-3.5 rounded-lg bg-slate-900/50 border border-slate-800 space-y-2 text-xs">
-                      <span className="font-mono text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Current Top Adherence Drivers
-                      </span>
-                      <div className="space-y-1.5">
-                        <span className="text-[11px] font-semibold text-emerald-400 block">Positive Factors:</span>
-                        {result.shapComparison.currentTopPositive.map((f, i) => (
-                          <div key={i} className="flex justify-between text-[11px] text-slate-300">
-                            <span>+ {f.displayName}</span>
-                            <span className="font-mono text-emerald-400">+{f.shapValue.toFixed(3)}</span>
-                          </div>
-                        ))}
-                        {result.shapComparison.currentTopNegative.length > 0 && (
-                          <>
-                            <span className="text-[11px] font-semibold text-rose-400 block pt-1">Negative Factors:</span>
-                            {result.shapComparison.currentTopNegative.map((f, i) => (
-                              <div key={i} className="flex justify-between text-[11px] text-slate-300">
-                                <span>- {f.displayName}</span>
-                                <span className="font-mono text-rose-400">{f.shapValue.toFixed(3)}</span>
+                <Accordion
+                  allowMultiple
+                  items={[
+                    ...(result.fiveFactorComparison ? [{
+                      id: 'five-factor',
+                      title: 'Five-Factor Decision Comparison',
+                      subtitle: 'Multi-objective evaluation across adherence, recovery preservation, and capacity',
+                      badge: '5-Factor Matrix',
+                      content: (
+                        <div className="space-y-2.5">
+                          {result.fiveFactorComparison.map((factor, idx) => (
+                            <div
+                              key={idx}
+                              className="p-3 rounded-lg bg-slate-900/50 border border-slate-800/90 text-xs space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-slate-200">{factor.factor}</span>
+                                  <span className="text-[10px] font-mono text-slate-400 px-1.5 py-0.5 rounded bg-slate-800">
+                                    {factor.weightPercent} Wt
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-3 font-mono">
+                                  <span className="text-slate-400">Current: {factor.currentScore}%</span>
+                                  <span className="text-white font-bold">What-If: {factor.whatIfScore}%</span>
+                                  <span className={`font-bold ${factor.delta >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                    {factor.delta >= 0 ? `+${factor.delta}%` : `${factor.delta}%`}
+                                  </span>
+                                </div>
                               </div>
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    </div>
 
-                    {/* WHAT-IF SHAP */}
-                    <div className="p-3.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 space-y-2 text-xs">
-                      <span className="font-mono text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
-                        What-If Top Adherence Drivers
-                      </span>
-                      <div className="space-y-1.5">
-                        <span className="text-[11px] font-semibold text-emerald-400 block">Positive Factors:</span>
-                        {result.shapComparison.whatIfTopPositive.map((f, i) => (
-                          <div key={i} className="flex justify-between text-[11px] text-slate-300">
-                            <span>+ {f.displayName}</span>
-                            <span className="font-mono text-emerald-400">+{f.shapValue.toFixed(3)}</span>
-                          </div>
-                        ))}
-                        {result.shapComparison.whatIfTopNegative.length > 0 && (
-                          <>
-                            <span className="text-[11px] font-semibold text-rose-400 block pt-1">Negative Factors:</span>
-                            {result.shapComparison.whatIfTopNegative.map((f, i) => (
-                              <div key={i} className="flex justify-between text-[11px] text-slate-300">
-                                <span>- {f.displayName}</span>
-                                <span className="font-mono text-rose-400">{f.shapValue.toFixed(3)}</span>
+                              <div className="space-y-1">
+                                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-slate-500 rounded-full"
+                                    style={{ width: `${factor.currentScore}%` }}
+                                    title={`Current: ${factor.currentScore}%`}
+                                  />
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-emerald-500 rounded-full"
+                                    style={{ width: `${factor.whatIfScore}%` }}
+                                    title={`What-If: ${factor.whatIfScore}%`}
+                                  />
+                                </div>
                               </div>
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
 
-                  <p className="text-[11px] text-slate-400">
-                    {result.shapComparison.disclaimer}
-                  </p>
-                </div>
-              )}
+                              <p className="text-[11px] text-slate-400 leading-relaxed pt-0.5">
+                                {factor.reason}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    }] : []),
+                    ...(result.shapComparison ? [{
+                      id: 'shap-explanation',
+                      title: 'SHAP-Based Model Explanation',
+                      subtitle: 'Current top adherence contributors vs. What-If counterfactual drivers',
+                      badge: result.shapComparison.isGenuineShap ? 'Genuine SHAP' : 'System Fallback',
+                      content: (
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 border-b border-slate-800 pb-2">
+                            <span>Adherence Attribution TreeSHAP</span>
+                            <span>Base Log-Odds: {result.shapComparison.baseValue}</span>
+                          </div>
 
-              {/* RECOMMENDATION RANKING UNDER WHAT-IF */}
-              {result.candidateRankings && result.candidateRankings.length > 0 && (
-                <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-                    <div>
-                      <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                        <span>Candidate Recommendation Ranking Under Scenario</span>
-                      </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        How all potential candidates rank under the simulated constraints via the Decision Intelligence Engine
-                      </p>
-                    </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300">
-                      Ranked by Composite Decision Score
-                    </span>
-                  </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-3.5 rounded-lg bg-slate-900/50 border border-slate-800 space-y-2 text-xs">
+                              <span className="font-mono text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                Current Top Adherence Drivers
+                              </span>
+                              <div className="space-y-1.5">
+                                <span className="text-[11px] font-semibold text-emerald-400 block">Positive Factors:</span>
+                                {result.shapComparison.currentTopPositive.map((f, i) => (
+                                  <div key={i} className="flex justify-between text-[11px] text-slate-300">
+                                    <span>+ {f.displayName}</span>
+                                    <span className="font-mono text-emerald-400">+{f.shapValue.toFixed(3)}</span>
+                                  </div>
+                                ))}
+                                {result.shapComparison.currentTopNegative.length > 0 && (
+                                  <>
+                                    <span className="text-[11px] font-semibold text-rose-400 block pt-1">Negative Factors:</span>
+                                    {result.shapComparison.currentTopNegative.map((f, i) => (
+                                      <div key={i} className="flex justify-between text-[11px] text-slate-300">
+                                        <span>- {f.displayName}</span>
+                                        <span className="font-mono text-rose-400">{f.shapValue.toFixed(3)}</span>
+                                      </div>
+                                    ))}
+                                  </>
+                                )}
+                              </div>
+                            </div>
 
-                  <div className="space-y-2">
-                    {result.candidateRankings.map((cand, idx) => (
-                      <div
-                        key={idx}
-                        className={`p-3 rounded-lg border transition-all text-xs ${
-                          cand.isRecommended
-                            ? 'bg-emerald-500/10 border-emerald-500/40 text-slate-200'
-                            : 'bg-slate-900/40 border-slate-800 text-slate-400'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`w-5 h-5 rounded-full flex items-center justify-center font-mono font-bold text-[10px] ${
+                            <div className="p-3.5 rounded-lg bg-emerald-500/5 border border-emerald-500/20 space-y-2 text-xs">
+                              <span className="font-mono text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">
+                                What-If Top Adherence Drivers
+                              </span>
+                              <div className="space-y-1.5">
+                                <span className="text-[11px] font-semibold text-emerald-400 block">Positive Factors:</span>
+                                {result.shapComparison.whatIfTopPositive.map((f, i) => (
+                                  <div key={i} className="flex justify-between text-[11px] text-slate-300">
+                                    <span>+ {f.displayName}</span>
+                                    <span className="font-mono text-emerald-400">+{f.shapValue.toFixed(3)}</span>
+                                  </div>
+                                ))}
+                                {result.shapComparison.whatIfTopNegative.length > 0 && (
+                                  <>
+                                    <span className="text-[11px] font-semibold text-rose-400 block pt-1">Negative Factors:</span>
+                                    {result.shapComparison.whatIfTopNegative.map((f, i) => (
+                                      <div key={i} className="flex justify-between text-[11px] text-slate-300">
+                                        <span>- {f.displayName}</span>
+                                        <span className="font-mono text-rose-400">{f.shapValue.toFixed(3)}</span>
+                                      </div>
+                                    ))}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <p className="text-[11px] text-slate-400 pt-1">
+                            {result.shapComparison.disclaimer}
+                          </p>
+                        </div>
+                      )
+                    }] : []),
+                    ...(result.candidateRankings && result.candidateRankings.length > 0 ? [{
+                      id: 'candidate-rankings',
+                      title: 'Candidate Recommendation Ranking Under Scenario',
+                      subtitle: 'How all potential candidates rank under simulated constraints',
+                      badge: 'Ranked Rationale',
+                      content: (
+                        <div className="space-y-2">
+                          {result.candidateRankings.map((cand, idx) => (
+                            <div
+                              key={idx}
+                              className={`p-3 rounded-lg border transition-all text-xs ${
                                 cand.isRecommended
-                                  ? 'bg-emerald-500 text-slate-950'
-                                  : 'bg-slate-800 text-slate-400'
+                                  ? 'bg-emerald-500/10 border-emerald-500/40 text-slate-200'
+                                  : 'bg-slate-900/40 border-slate-800 text-slate-400'
                               }`}
                             >
-                              {cand.rank}
-                            </span>
-                            <span className="font-bold text-white text-xs">{cand.title}</span>
+                              <div className="flex items-center justify-between mb-1">
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className={`w-5 h-5 rounded-full flex items-center justify-center font-mono font-bold text-[10px] ${
+                                      cand.isRecommended
+                                        ? 'bg-emerald-500 text-slate-950'
+                                        : 'bg-slate-800 text-slate-400'
+                                    }`}
+                                  >
+                                    {cand.rank}
+                                  </span>
+                                  <span className="font-bold text-white text-xs">{cand.title}</span>
+                                </div>
+                                <div className="flex items-center gap-3 font-mono">
+                                  <span className="text-slate-400">Adherence: {cand.predictedAdherence}%</span>
+                                  <span className="font-bold text-indigo-400">
+                                    Score: {Math.round(cand.finalDecisionScore * 100)} / 100
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="text-[11px] text-slate-400 pl-7 leading-relaxed">
+                                {cand.rankingRationale}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    }] : []),
+                    ...(result.goalConflictAnalysis ? [{
+                      id: 'goal-conflicts',
+                      title: 'Long-Term Goal Trade-off & Preservation',
+                      subtitle: result.goalConflictAnalysis.hasConflict ? 'Active Trade-off Detected' : 'Trajectory Aligned',
+                      badge: result.goalConflictAnalysis.hasConflict ? 'Trade-off' : 'Aligned',
+                      content: (
+                        <div className="space-y-2.5 text-xs">
+                          <p className="text-slate-300 leading-relaxed">
+                            {result.goalConflictAnalysis.longTermTradeoffNotice}
+                          </p>
+                          {result.goalConflictAnalysis.hasConflict && (
+                            <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20 text-xs text-amber-300 space-y-1">
+                              <span className="font-bold block">Trade-off Notice for "{result.goalConflictAnalysis.goalTitle}":</span>
+                              <p className="leading-relaxed">{result.goalConflictAnalysis.explanation}</p>
+                              <p className="font-semibold text-emerald-300 mt-1">
+                                Resolution: {result.goalConflictAnalysis.resolution}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }] : []),
+                    ...(result.technicalDetails ? [{
+                      id: 'tech-audit',
+                      title: 'Technical Details & Feature Snapshot (Audit Mode)',
+                      subtitle: 'Model version, pipeline timestamp, and simulated vector',
+                      badge: 'Audit Vector',
+                      content: (
+                        <div className="space-y-3 font-mono text-xs">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                            <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                              <span className="text-slate-500 block text-[10px]">Model:</span>
+                              <span className="text-slate-200">{result.technicalDetails.modelName}</span>
+                            </div>
+                            <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                              <span className="text-slate-500 block text-[10px]">Version:</span>
+                              <span className="text-slate-200">{result.technicalDetails.modelVersion}</span>
+                            </div>
+                            <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                              <span className="text-slate-500 block text-[10px]">Method:</span>
+                              <span className="text-slate-200">{result.technicalDetails.explanationMethod}</span>
+                            </div>
+                            <div className="p-2 rounded bg-slate-900 border border-slate-800">
+                              <span className="text-slate-500 block text-[10px]">Timestamp:</span>
+                              <span className="text-slate-200">{result.technicalDetails.timestamp.split('T')[1].split('.')[0]}Z</span>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3 font-mono">
-                            <span className="text-slate-400">Adherence: {cand.predictedAdherence}%</span>
-                            <span className="font-bold text-indigo-400">
-                              Score: {Math.round(cand.finalDecisionScore * 100)} / 100
-                            </span>
+
+                          <div className="p-3 rounded bg-slate-950 border border-slate-800/80 text-[10px] text-slate-400 space-y-1 overflow-x-auto">
+                            <span className="font-bold text-slate-300 block mb-1">Simulated Feature Vector:</span>
+                            <pre>{JSON.stringify(result.technicalDetails.simulatedVector, null, 2)}</pre>
                           </div>
                         </div>
-                        <p className="text-[11px] text-slate-400 pl-7 leading-relaxed">
-                          {cand.rankingRationale}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* GOAL CONFLICT & LONG-TERM PRESERVATION */}
-              {result.goalConflictAnalysis && (
-                <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 shadow-xs space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                      <Target className="w-4 h-4 text-amber-400" />
-                      <span>Long-Term Goal Trade-off & Preservation</span>
-                    </h3>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
-                      result.goalConflictAnalysis.hasConflict
-                        ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                        : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                    }`}>
-                      {result.goalConflictAnalysis.hasConflict ? 'Active Trade-off' : 'Aligned Trajectory'}
-                    </span>
-                  </div>
-
-                  <p className="text-xs text-slate-300 leading-relaxed">
-                    {result.goalConflictAnalysis.longTermTradeoffNotice}
-                  </p>
-
-                  {result.goalConflictAnalysis.hasConflict && (
-                    <div className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/20 text-xs text-amber-300 space-y-1">
-                      <span className="font-bold block">Trade-off Notice for "{result.goalConflictAnalysis.goalTitle}":</span>
-                      <p className="leading-relaxed">{result.goalConflictAnalysis.explanation}</p>
-                      <p className="font-semibold text-emerald-300 mt-1">
-                        Resolution: {result.goalConflictAnalysis.resolution}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* EXPANDABLE TECHNICAL DETAILS / AUDIT SECTION */}
-              <div className="bg-[#0F0F11] border border-slate-800 rounded-xl overflow-hidden">
-                <button
-                  onClick={() => setShowTechnicalDetails(!showTechnicalDetails)}
-                  className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-900/40 transition-colors"
-                >
-                  <span className="text-xs font-bold text-slate-300 flex items-center gap-2">
-                    <Info className="w-4 h-4 text-slate-400" />
-                    <span>Technical Details & Feature Snapshot (Audit Mode)</span>
-                  </span>
-                  {showTechnicalDetails ? (
-                    <ChevronUp className="w-4 h-4 text-slate-400" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4 text-slate-400" />
-                  )}
-                </button>
-
-                {showTechnicalDetails && result.technicalDetails && (
-                  <div className="p-4 border-t border-slate-800 bg-slate-900/30 text-xs font-mono space-y-3">
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
-                      <div className="p-2 rounded bg-slate-900 border border-slate-800">
-                        <span className="text-slate-500 block text-[10px]">Model:</span>
-                        <span className="text-slate-200">{result.technicalDetails.modelName}</span>
-                      </div>
-                      <div className="p-2 rounded bg-slate-900 border border-slate-800">
-                        <span className="text-slate-500 block text-[10px]">Version:</span>
-                        <span className="text-slate-200">{result.technicalDetails.modelVersion}</span>
-                      </div>
-                      <div className="p-2 rounded bg-slate-900 border border-slate-800">
-                        <span className="text-slate-500 block text-[10px]">Method:</span>
-                        <span className="text-slate-200">{result.technicalDetails.explanationMethod}</span>
-                      </div>
-                      <div className="p-2 rounded bg-slate-900 border border-slate-800">
-                        <span className="text-slate-500 block text-[10px]">Timestamp:</span>
-                        <span className="text-slate-200">{result.technicalDetails.timestamp.split('T')[1].split('.')[0]}Z</span>
-                      </div>
-                    </div>
-
-                    <div className="p-3 rounded bg-slate-950 border border-slate-800/80 text-[10px] text-slate-400 space-y-1 overflow-x-auto">
-                      <span className="font-bold text-slate-300 block mb-1">Simulated Feature Vector:</span>
-                      <pre>{JSON.stringify(result.technicalDetails.simulatedVector, null, 2)}</pre>
-                    </div>
-                  </div>
-                )}
+                      )
+                    }] : [])
+                  ]}
+                />
               </div>
 
               {/* Action Bar: Ask AI Coach */}

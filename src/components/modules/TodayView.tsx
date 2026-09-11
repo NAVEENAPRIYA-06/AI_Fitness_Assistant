@@ -3,7 +3,7 @@ import { useHealthPilot } from '../../context/HealthPilotContext.js';
 import { AdherenceMeter } from '../common/AdherenceMeter.js';
 import { MetricBadge } from '../common/MetricBadge.js';
 import { ExplainabilityPanel } from '../common/ExplainabilityPanel.js';
-import { ShapAttributionBar } from '../common/ShapAttributionBar.js';
+import { Accordion } from '../common/Accordion.js';
 import {
   Sparkles,
   AlertTriangle,
@@ -13,13 +13,16 @@ import {
   Droplets,
   Moon,
   Zap,
-  ArrowRight,
   ShieldCheck,
   ChevronRight,
   Plus,
   Cpu,
-  Brain,
-  Layers
+  Layers,
+  Activity,
+  ArrowRight,
+  Info,
+  Calendar,
+  Compass
 } from 'lucide-react';
 
 export const TodayView: React.FC = () => {
@@ -28,12 +31,18 @@ export const TodayView: React.FC = () => {
     context,
     evolvingState,
     behaviorSummary,
+    currentUser,
+    profile,
     setActiveModule,
     updateContext,
     submitOutcome
   } = useHealthPilot();
 
   const [logModalOpen, setLogModalOpen] = useState(false);
+  const [alternativesOpen, setAlternativesOpen] = useState(false);
+  const [showStateDetails, setShowStateDetails] = useState(false);
+  const [showDetailedExplanation, setShowDetailedExplanation] = useState(false);
+
   const [outcomeStatus, setOutcomeStatus] = useState<'completed' | 'partially_completed' | 'skipped'>('completed');
   const [actualDuration, setActualDuration] = useState(recommendation?.durationMinutes || 20);
   const [skipReason, setSkipReason] = useState<any>('too_tired');
@@ -42,14 +51,23 @@ export const TodayView: React.FC = () => {
 
   if (!recommendation || !context || !evolvingState) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-[400px]">
+      <div className="p-12 flex items-center justify-center min-h-[420px]">
         <div className="text-center space-y-3">
-          <div className="w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-slate-400 font-medium">Synthesizing multi-domain user state and daily context...</p>
+          <div className="w-10 h-10 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-slate-400 font-medium">Synthesizing personal health context and recommendations...</p>
         </div>
       </div>
     );
   }
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 18) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const userName = currentUser?.name || profile?.name || 'there';
 
   const handleQuickHydration = async () => {
     const current = context.hydrationLiters || 1.2;
@@ -83,397 +101,437 @@ export const TodayView: React.FC = () => {
       setLogModalOpen(false);
       setFeedback('');
     } catch (err) {
-      console.error(err);
+      console.error('Error submitting outcome:', err);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const recoveryScore = context.recoveryScore ?? evolvingState.recoveryReadiness ?? 70;
+
   return (
-    <div className="space-y-6">
-      {/* Top Banner: Decision Intelligence Summary */}
-      <div className="bg-gradient-to-br from-slate-900 to-[#0F0F11] border border-slate-800 text-white rounded-2xl p-6 shadow-sm relative overflow-hidden">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="max-w-2xl space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono uppercase tracking-wider text-emerald-400 font-semibold flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                Adaptive Decision Engine Output
+    <div className="space-y-8 max-w-5xl mx-auto">
+      {/* SECTION 1 — TODAY HEADER */}
+      <header className="border-b border-slate-800/80 pb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-semibold text-emerald-400 tracking-wide uppercase flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5" />
+                Personal Health Intelligence
               </span>
-              <span className="text-[11px] text-slate-500">•</span>
-              <span className="text-xs text-slate-400">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+              <span className="text-slate-600 text-xs">•</span>
+              <span className="text-xs text-slate-400 font-mono">
+                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </span>
             </div>
-            <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              {recommendation.title}
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400 leading-relaxed italic">
-              Targeting <strong className="text-emerald-400 font-medium not-italic">{recommendation.targetDomain}</strong>. Tailored to buffer acute sleep debt while safeguarding long-term habit continuity.
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
+              {getGreeting()}, {userName}
+            </h1>
+            <p className="text-sm text-slate-400 mt-1">
+              Based on your current context, here is today's personalized recommendation.
             </p>
-            <div className="flex flex-wrap items-center gap-2 pt-2">
-              <MetricBadge label={`${recommendation.durationMinutes} Minutes`} variant="slate" icon={<Clock className="w-3 h-3" />} />
-              <MetricBadge label={recommendation.intensity.toUpperCase() + ' INTENSITY'} variant={recommendation.intensity === 'low' ? 'emerald' : 'amber'} />
-              <MetricBadge label={recommendation.environment.toUpperCase()} variant="teal" icon={<Home className="w-3 h-3" />} />
-              <MetricBadge label={recommendation.category.replace('_', ' ').toUpperCase()} variant="indigo" />
-            </div>
           </div>
 
-          <div className="shrink-0 flex flex-col sm:flex-row md:flex-col items-start md:items-end gap-3">
-            <div className="bg-slate-800/40 backdrop-blur-md rounded-xl p-3.5 border border-white/5 flex flex-col gap-2.5 min-w-[220px]">
-              <div className="flex items-center justify-between gap-4">
-                <div className="text-left">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Predicted Adherence</span>
-                  <span className="text-xl font-mono font-bold text-emerald-400">{recommendation.predictedAdherence}%</span>
-                </div>
-                <div className="h-8 w-px bg-slate-700" />
-                <div className="text-right">
-                  <span className="text-[10px] uppercase tracking-wider text-slate-400 block font-semibold">Health Suitability</span>
-                  <span className="text-xl font-mono font-bold text-teal-300">{recommendation.healthSuitabilityScore}%</span>
-                </div>
-              </div>
-
-              {/* Machine Learning Model Provenance Tag */}
-              <div className="pt-2 border-t border-slate-700/60 flex items-center justify-between gap-2 text-[10px] font-mono">
-                <span className="flex items-center gap-1.5 text-slate-300 truncate" title={recommendation.modelName}>
-                  <Cpu className="w-3 h-3 text-cyan-400 shrink-0" />
-                  <span className="truncate">{recommendation.modelName || 'Logistic Regression'}</span>
-                </span>
-                <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold shrink-0 ${
-                  recommendation.isModelPlaceholder
-                    ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                    : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                }`}>
-                  {recommendation.isModelPlaceholder
-                    ? 'Heuristic Fallback'
-                    : recommendation.dataSourceLabel?.includes('seed')
-                      ? 'ML Seed Model'
-                      : 'Trained ML Model'}
-                </span>
-              </div>
-            </div>
-
+          <div className="flex items-center gap-2.5 self-start sm:self-auto">
+            <button
+              onClick={() => setActiveModule('context')}
+              className="px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-xs font-medium text-slate-300 hover:text-white transition-colors"
+            >
+              Update Context
+            </button>
             <button
               onClick={() => setLogModalOpen(true)}
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-[#0A0A0B] bg-emerald-500 hover:bg-emerald-400 transition-colors shadow-xs"
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#0A0A0B] text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm"
             >
-              <CheckCircle2 className="w-4 h-4" />
-              <span>Log Action Outcome</span>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Log Activity</span>
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Goal-Condition Conflict Alert (if detected) */}
-      {recommendation.goalConflict.hasConflict && (
-        <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 flex items-start gap-3.5">
-          <div className="p-2 bg-amber-500/20 rounded-lg text-amber-400 shrink-0 mt-0.5">
-            <AlertTriangle className="w-5 h-5" />
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-amber-300">Goal-Condition Conflict Detected</h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
-                High Priority Conflict
-              </span>
-            </div>
-            <p className="text-xs text-amber-200/90 leading-relaxed">
-              <strong>{recommendation.goalConflict.goalName}</strong>: {recommendation.goalConflict.conflictExplanation}
-            </p>
-            <p className="text-xs text-slate-300 pt-1">
-              <strong className="text-white">Resolution Applied:</strong> {recommendation.goalConflict.recommendedResolution}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Transparent Multi-Factor Decision Score Breakdown */}
-      <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <Layers className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white tracking-tight">Multi-Factor Decision Score</h3>
-                <span className="text-xs font-mono font-bold text-emerald-400 px-2 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30">
-                  {recommendation.finalDecisionScore ? `${recommendation.finalDecisionScore} / 100` : `${recommendation.healthSuitabilityScore} / 100`}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Composite utility synthesizing physical readiness, machine learning completion probability, active goals, and behavioral fit
-              </p>
-            </div>
-          </div>
-
+      {/* SECTION 2 — CURRENT STATE (Compact Group) */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+            Current State
+          </h2>
           <button
-            onClick={() => setActiveModule('plan_lab')}
-            className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 self-start sm:self-auto"
+            onClick={() => setShowStateDetails(!showStateDetails)}
+            className="text-xs text-emerald-400 hover:text-emerald-300 font-medium flex items-center gap-1 transition-colors"
           >
-            <span>Inspect in Plan Lab</span>
-            <ChevronRight className="w-3.5 h-3.5" />
+            <span>{showStateDetails ? 'Hide details' : 'View all metrics'}</span>
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showStateDetails ? 'rotate-90' : ''}`} />
           </button>
         </div>
 
-        {/* 5 Scoring Factors Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
-          {/* 1. Health Suitability */}
-          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 space-y-1.5">
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-semibold uppercase tracking-wider">
-              <span>Suitability</span>
-              <span className="font-mono text-slate-500">30% wt</span>
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          {/* 1. Recovery */}
+          <div className="p-3.5 bg-[#121215] rounded-xl border border-slate-800/90 space-y-1">
+            <div className="flex items-center justify-between text-slate-400 text-xs">
+              <span className="font-medium">Recovery</span>
+              <Activity className="w-3.5 h-3.5 text-emerald-400" />
             </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-mono font-bold text-teal-300">
-                {recommendation.suitabilityScore ?? recommendation.healthSuitabilityScore}%
-              </span>
-              {recommendation.scoreBreakdown && (
-                <span className="text-[10px] font-mono text-slate-500">
-                  (+{recommendation.scoreBreakdown.suitabilityContribution} pts)
-                </span>
-              )}
+            <div className="text-xl font-mono font-bold text-white">
+              {recoveryScore}%
             </div>
-            <p className="text-[10px] text-slate-400 leading-tight">
-              Physiological match with autonomic recovery & fatigue
-            </p>
+            <div className="text-[11px] font-medium text-emerald-400">
+              {recoveryScore >= 75 ? 'Optimal' : recoveryScore >= 60 ? 'Moderate' : 'Constrained'}
+            </div>
           </div>
 
-          {/* 2. Predicted Adherence */}
-          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 space-y-1.5">
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-semibold uppercase tracking-wider">
-              <span>Adherence</span>
-              <span className="font-mono text-slate-500">25% wt</span>
+          {/* 2. Energy */}
+          <div className="p-3.5 bg-[#121215] rounded-xl border border-slate-800/90 space-y-1">
+            <div className="flex items-center justify-between text-slate-400 text-xs">
+              <span className="font-medium">Energy</span>
+              <Zap className="w-3.5 h-3.5 text-amber-400" />
             </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-mono font-bold text-emerald-400">
-                {recommendation.predictedAdherence}%
-              </span>
-              {recommendation.scoreBreakdown && (
-                <span className="text-[10px] font-mono text-slate-500">
-                  (+{recommendation.scoreBreakdown.predictedAdherenceContribution} pts)
-                </span>
-              )}
+            <div className="text-xl font-mono font-bold text-white">
+              {context.energyLevel} <span className="text-xs font-normal text-slate-500">/ 10</span>
             </div>
-            <p className="text-[10px] text-slate-400 leading-tight">
-              Statistical likelihood of session completion
-            </p>
+            <div className={`text-[11px] font-medium ${context.energyLevel >= 7 ? 'text-emerald-400' : context.energyLevel <= 4 ? 'text-rose-400' : 'text-amber-400'}`}>
+              {context.energyLevel >= 7 ? 'High' : context.energyLevel <= 4 ? 'Low' : 'Moderate'}
+            </div>
           </div>
 
-          {/* 3. Goal Alignment */}
-          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 space-y-1.5">
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-semibold uppercase tracking-wider">
-              <span>Goal Alignment</span>
-              <span className="font-mono text-slate-500">20% wt</span>
+          {/* 3. Fatigue */}
+          <div className="p-3.5 bg-[#121215] rounded-xl border border-slate-800/90 space-y-1">
+            <div className="flex items-center justify-between text-slate-400 text-xs">
+              <span className="font-medium">Fatigue</span>
+              <span className="w-2 h-2 rounded-full bg-rose-400/80" />
             </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-mono font-bold text-cyan-400">
-                {recommendation.goalAlignmentScore || 85}%
-              </span>
-              {recommendation.scoreBreakdown && (
-                <span className="text-[10px] font-mono text-slate-500">
-                  (+{recommendation.scoreBreakdown.goalAlignmentContribution} pts)
-                </span>
-              )}
+            <div className="text-xl font-mono font-bold text-white">
+              {context.fatigueLevel} <span className="text-xs font-normal text-slate-500">/ 10</span>
             </div>
-            <p className="text-[10px] text-slate-400 leading-tight">
-              Direct alignment with 10K running and sleep targets
-            </p>
+            <div className={`text-[11px] font-medium ${context.fatigueLevel >= 7 ? 'text-rose-400' : context.fatigueLevel <= 3 ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {context.fatigueLevel >= 7 ? 'Elevated' : context.fatigueLevel <= 3 ? 'Low' : 'Manageable'}
+            </div>
           </div>
 
-          {/* 4. Context Feasibility */}
-          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 space-y-1.5">
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-semibold uppercase tracking-wider">
-              <span>Feasibility</span>
-              <span className="font-mono text-slate-500">15% wt</span>
+          {/* 4. Sleep */}
+          <div className="p-3.5 bg-[#121215] rounded-xl border border-slate-800/90 space-y-1">
+            <div className="flex items-center justify-between text-slate-400 text-xs">
+              <span className="font-medium">Sleep</span>
+              <Moon className="w-3.5 h-3.5 text-indigo-400" />
             </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-mono font-bold text-indigo-400">
-                {recommendation.contextFeasibilityScore || 95}%
-              </span>
-              {recommendation.scoreBreakdown && (
-                <span className="text-[10px] font-mono text-slate-500">
-                  (+{recommendation.scoreBreakdown.contextFeasibilityContribution} pts)
-                </span>
-              )}
+            <div className="text-xl font-mono font-bold text-white">
+              {context.sleepHours.toFixed(1)} <span className="text-xs font-normal text-slate-500">h</span>
             </div>
-            <p className="text-[10px] text-slate-400 leading-tight">
-              Time buffer, home equipment, and environment fit
-            </p>
+            <div className={`text-[11px] font-medium ${context.sleepHours < 6.5 ? 'text-rose-400' : context.sleepHours >= 7.5 ? 'text-emerald-400' : 'text-amber-400'}`}>
+              {context.sleepHours < 6.5 ? 'Deficit' : context.sleepHours >= 7.5 ? 'Restorative' : 'Normal'}
+            </div>
           </div>
 
-          {/* 5. Behavioral Fit */}
-          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 space-y-1.5 col-span-2 sm:col-span-1">
-            <div className="flex items-center justify-between text-slate-400 text-[10px] font-semibold uppercase tracking-wider">
-              <span>Behavioral Fit</span>
-              <span className="font-mono text-slate-500">10% wt</span>
+          {/* 5. Available Time */}
+          <div className="p-3.5 bg-[#121215] rounded-xl border border-slate-800/90 space-y-1 col-span-2 sm:col-span-1">
+            <div className="flex items-center justify-between text-slate-400 text-xs">
+              <span className="font-medium">Available</span>
+              <Clock className="w-3.5 h-3.5 text-teal-400" />
             </div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-lg font-mono font-bold text-purple-400">
-                {recommendation.behavioralFitScore || 77}%
-              </span>
-              {recommendation.scoreBreakdown && (
-                <span className="text-[10px] font-mono text-slate-500">
-                  (+{recommendation.scoreBreakdown.behavioralFitContribution} pts)
-                </span>
-              )}
+            <div className="text-xl font-mono font-bold text-white">
+              {context.availableMinutes} <span className="text-xs font-normal text-slate-500">m</span>
             </div>
-            <p className="text-[10px] text-slate-400 leading-tight">
-              Duration and environment consistency patterns
-            </p>
+            <div className="text-[11px] font-medium text-slate-400 capitalize truncate">
+              {context.environment || 'Home'}
+            </div>
           </div>
         </div>
 
-        {/* Adherence vs. Suitability Distinction & Transparency Notice */}
-        <div className="p-3 rounded-lg bg-slate-900/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-[11px] text-slate-400">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
-            <span>
-              <strong className="text-slate-200">Adherence vs. Suitability Distinction:</strong> Health Suitability ({recommendation.suitabilityScore ?? recommendation.healthSuitabilityScore}%) reflects physical tolerance based on acute recovery, sleep, and fatigue. Predicted Adherence ({recommendation.predictedAdherence}%) reflects statistical likelihood of completion based on behavioral history.
-            </span>
+        {/* Expandable Extended State */}
+        {showStateDetails && (
+          <div className="p-4 bg-[#121215] rounded-xl border border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs animate-fade-in">
+            <div>
+              <span className="text-slate-500 block mb-0.5">Stress Level</span>
+              <span className="font-mono font-semibold text-slate-200">{context.stressLevel} / 10</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block mb-0.5">Soreness</span>
+              <span className="font-mono font-semibold text-slate-200">{context.sorenessLevel} / 10</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block mb-0.5">Weekly Adherence</span>
+              <span className="font-mono font-semibold text-emerald-400">{evolvingState.weeklyAdherenceRate}%</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block mb-0.5">Primary Goal</span>
+              <span className="font-medium text-slate-300 truncate block">
+                {profile?.primaryGoal || 'Cardiovascular Conditioning'}
+              </span>
+            </div>
           </div>
-          <span className="text-[10px] font-mono text-slate-500 shrink-0">
-            * ML probability estimate — not a clinical guarantee
-          </span>
+        )}
+      </section>
+
+      {/* SECTION 3 — TODAY'S RECOMMENDATION (Visual Dominance) */}
+      <section className="bg-gradient-to-br from-[#121216] to-[#0D0D10] border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-md relative overflow-hidden space-y-6">
+        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+          <div className="space-y-3 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                Recommended Today
+              </span>
+              <span className="text-xs text-slate-500">•</span>
+              <span className="text-xs text-slate-400">
+                Targeting <strong className="text-slate-200 font-medium">{recommendation.targetDomain}</strong>
+              </span>
+            </div>
+
+            <h3 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">
+              {recommendation.title}
+            </h3>
+
+            <p className="text-sm text-slate-300 leading-relaxed max-w-2xl">
+              {recommendation.whyRecommended}
+            </p>
+
+            {/* Core Badges */}
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <MetricBadge label={`${recommendation.durationMinutes} Minutes`} variant="slate" icon={<Clock className="w-3.5 h-3.5" />} />
+              <MetricBadge label={recommendation.intensity.toUpperCase() + ' INTENSITY'} variant={recommendation.intensity === 'low' ? 'emerald' : 'amber'} />
+              <MetricBadge label={recommendation.environment.toUpperCase()} variant="teal" icon={<Home className="w-3.5 h-3.5" />} />
+              <MetricBadge label={`Goal Alignment: ${recommendation.goalAlignmentScore || 85}%`} variant="indigo" />
+            </div>
+          </div>
+
+          {/* Adherence & Suitability Pill */}
+          <div className="shrink-0 bg-slate-900/80 border border-slate-800 rounded-xl p-4 min-w-[200px] flex flex-col gap-2.5">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block">Predicted Adherence</span>
+                <span className="text-2xl font-mono font-bold text-emerald-400">{recommendation.predictedAdherence}%</span>
+              </div>
+              <div className="h-8 w-px bg-slate-800" />
+              <div className="text-right">
+                <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block">Suitability</span>
+                <span className="text-2xl font-mono font-bold text-teal-300">{recommendation.healthSuitabilityScore}%</span>
+              </div>
+            </div>
+            <div className="text-[10px] text-slate-400 text-center border-t border-slate-800/80 pt-2 font-mono">
+              Calibrated to acute recovery
+            </div>
+          </div>
         </div>
 
-        {/* Key Decision Factors List */}
-        {recommendation.explanation?.keyFactors && (
-          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
-              Transparent Decision Rationale Factors
-            </span>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-              {recommendation.explanation.keyFactors.map((factor, idx) => (
-                <div key={idx} className="flex items-start gap-2 text-slate-300">
-                  <span className="text-emerald-400 font-bold mt-0.5">•</span>
-                  <span className="text-[11px] leading-relaxed">{factor}</span>
+        {/* Goal-Condition Conflict Alert (if detected) */}
+        {recommendation.goalConflict.hasConflict && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <div className="font-bold text-amber-300 flex items-center gap-2">
+                <span>Goal-Condition Conflict Managed</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-500/30 font-mono">
+                  Adaptive Resolution
+                </span>
+              </div>
+              <p className="text-amber-200/90 leading-relaxed">
+                <strong>{recommendation.goalConflict.goalName}</strong>: {recommendation.goalConflict.conflictExplanation}
+              </p>
+              <p className="text-slate-300 pt-0.5">
+                <strong className="text-white">HealthPilot Adjustment:</strong> {recommendation.goalConflict.recommendedResolution}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Action Controls */}
+        <div className="pt-4 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <button
+              onClick={() => setLogModalOpen(true)}
+              className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-[#0A0A0B] text-xs font-bold transition-all flex items-center gap-2 shadow-sm"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Start / Log Activity</span>
+            </button>
+            <button
+              onClick={() => setAlternativesOpen(!alternativesOpen)}
+              className="px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white text-xs font-semibold transition-colors"
+            >
+              {alternativesOpen ? 'Hide Alternatives' : 'View Alternatives'}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs">
+            <button
+              onClick={() => setActiveModule('what_if')}
+              className="text-slate-400 hover:text-emerald-400 font-medium flex items-center gap-1 transition-colors"
+            >
+              <span>Test What-If</span>
+              <ArrowRight className="w-3 h-3" />
+            </button>
+          </div>
+        </div>
+
+        {/* Collapsible Alternatives List */}
+        {alternativesOpen && (
+          <div className="pt-4 border-t border-slate-800/80 space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Alternative Options Considered
+              </h4>
+              <button
+                onClick={() => setActiveModule('plan_lab')}
+                className="text-xs text-emerald-400 hover:underline font-medium"
+              >
+                Compare in Plan Lab →
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {recommendation.alternatives.map(alt => (
+                <div key={alt.id} className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/40 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <h5 className="text-xs font-bold text-white">{alt.title}</h5>
+                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 shrink-0">
+                      {alt.durationMinutes}m
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
+                    {alt.rationale}
+                  </p>
+                  <div className="pt-1.5 border-t border-slate-800/60 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                    <span>Adherence: {alt.predictedAdherence}%</span>
+                    <span>Suitability: {alt.healthSuitabilityScore}%</span>
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* 3-Column Overview Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        {/* Card 1: Today's Context */}
-        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-white tracking-tight">Today's Context</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5">
-                Last updated:{' '}
-                <span className="text-slate-300 font-medium">
-                  {context.updatedAt
-                    ? new Date(context.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    : 'Today, morning check-in'}
-                </span>
-              </p>
+      {/* SECTION 4 — WHY THIS RECOMMENDATION? */}
+      <section className="bg-[#121215] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+              Why This Recommendation?
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Multi-factor rationale balancing immediate readiness and long-term targets
+            </p>
+          </div>
+          <button
+            onClick={() => setShowDetailedExplanation(!showDetailedExplanation)}
+            className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+          >
+            <span>{showDetailedExplanation ? 'Hide detailed explanation' : 'View detailed explanation'}</span>
+            <ChevronRight className={`w-3.5 h-3.5 transition-transform ${showDetailedExplanation ? 'rotate-90' : ''}`} />
+          </button>
+        </div>
+
+        {/* 5-Factor Concise Summary */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs">
+          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-1">
+            <span className="text-[10px] font-medium text-slate-400 block uppercase">Suitability</span>
+            <div className="text-base font-mono font-bold text-teal-300">
+              {recommendation.suitabilityScore ?? recommendation.healthSuitabilityScore}%
             </div>
-            <button
-              onClick={() => setActiveModule('context')}
-              className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
-            >
-              <span>Edit</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
+            <p className="text-[10px] text-slate-500 leading-tight">Physical tolerance</p>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 text-xs">
-            {/* Sleep */}
-            <div className="p-2.5 bg-slate-800/40 rounded-lg border border-white/5">
-              <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
-                <Moon className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="font-medium">Sleep</span>
-              </div>
-              <span className="font-mono font-bold text-white text-sm">
-                {context.sleepHours.toFixed(1)} h
-              </span>
-              <span className={`text-[10px] block mt-0.5 font-medium ${context.sleepHours < 6.5 ? 'text-rose-400' : context.sleepHours >= 7.5 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {context.sleepHours < 6.5 ? 'Sleep deficit' : context.sleepHours >= 7.5 ? 'Optimal duration' : 'Moderate sleep'}
-              </span>
+          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-1">
+            <span className="text-[10px] font-medium text-slate-400 block uppercase">Adherence</span>
+            <div className="text-base font-mono font-bold text-emerald-400">
+              {recommendation.predictedAdherence}%
             </div>
-
-            {/* Energy */}
-            <div className="p-2.5 bg-slate-800/40 rounded-lg border border-white/5">
-              <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
-                <Zap className="w-3.5 h-3.5 text-amber-400" />
-                <span className="font-medium">Energy</span>
-              </div>
-              <span className="font-mono font-bold text-white text-sm">
-                {context.energyLevel} / 10
-              </span>
-              <span className={`text-[10px] block mt-0.5 font-medium ${context.energyLevel >= 7 ? 'text-emerald-400' : context.energyLevel <= 4 ? 'text-rose-400' : 'text-amber-400'}`}>
-                {context.energyLevel >= 7 ? 'High energy' : context.energyLevel <= 4 ? 'Low energy' : 'Moderate energy'}
-              </span>
-            </div>
-
-            {/* Fatigue */}
-            <div className="p-2.5 bg-slate-800/40 rounded-lg border border-white/5">
-              <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
-                <span className="font-medium">Fatigue</span>
-              </div>
-              <span className="font-mono font-bold text-white text-sm">
-                {context.fatigueLevel} / 10
-              </span>
-              <span className={`text-[10px] block mt-0.5 font-medium ${context.fatigueLevel >= 7 ? 'text-rose-400' : context.fatigueLevel <= 3 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {context.fatigueLevel >= 7 ? 'High fatigue' : context.fatigueLevel <= 3 ? 'Low fatigue' : 'Manageable strain'}
-              </span>
-            </div>
-
-            {/* Stress */}
-            <div className="p-2.5 bg-slate-800/40 rounded-lg border border-white/5">
-              <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-                <span className="font-medium">Stress</span>
-              </div>
-              <span className="font-mono font-bold text-white text-sm">
-                {context.stressLevel} / 10
-              </span>
-              <span className={`text-[10px] block mt-0.5 font-medium ${context.stressLevel >= 7 ? 'text-rose-400' : context.stressLevel <= 3 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {context.stressLevel >= 7 ? 'Elevated stress' : context.stressLevel <= 3 ? 'Low stress' : 'Moderate stress'}
-              </span>
-            </div>
-
-            {/* Available Time */}
-            <div className="p-2.5 bg-slate-800/40 rounded-lg border border-white/5">
-              <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
-                <Clock className="w-3.5 h-3.5 text-teal-400" />
-                <span className="font-medium">Available Time</span>
-              </div>
-              <span className="font-mono font-bold text-white text-sm">
-                {context.availableMinutes} min
-              </span>
-              <span className="text-[10px] text-slate-400 block mt-0.5 capitalize font-medium">
-                {context.preferredTime || 'Morning'} preferred
-              </span>
-            </div>
-
-            {/* Environment */}
-            <div className="p-2.5 bg-slate-800/40 rounded-lg border border-white/5">
-              <div className="flex items-center gap-1.5 text-slate-400 mb-0.5">
-                <Home className="w-3.5 h-3.5 text-emerald-400" />
-                <span className="font-medium">Environment</span>
-              </div>
-              <span className="font-bold text-white text-sm capitalize">
-                {context.environment}
-              </span>
-              <span className="text-[10px] text-emerald-400 block mt-0.5 font-medium truncate">
-                {(context.equipmentAvailable || []).length} equipment items
-              </span>
-            </div>
+            <p className="text-[10px] text-slate-500 leading-tight">ML completion prob</p>
           </div>
 
-          {/* Hydration Mini Widget */}
-          <div className="pt-2 border-t border-slate-800">
-            <div className="flex items-center justify-between text-xs mb-1.5">
-              <div className="flex items-center gap-1.5 text-slate-300 font-medium">
+          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-1">
+            <span className="text-[10px] font-medium text-slate-400 block uppercase">Goal Alignment</span>
+            <div className="text-base font-mono font-bold text-cyan-400">
+              {recommendation.goalAlignmentScore || 85}%
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight">Target support</p>
+          </div>
+
+          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-1">
+            <span className="text-[10px] font-medium text-slate-400 block uppercase">Feasibility</span>
+            <div className="text-base font-mono font-bold text-indigo-400">
+              {recommendation.contextFeasibilityScore || 95}%
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight">Time & gear match</p>
+          </div>
+
+          <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-1 col-span-2 sm:col-span-1">
+            <span className="text-[10px] font-medium text-slate-400 block uppercase">Behavioral Fit</span>
+            <div className="text-base font-mono font-bold text-purple-400">
+              {recommendation.behavioralFitScore || 77}%
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight">Habit pattern fit</p>
+          </div>
+        </div>
+
+        {/* Expandable Detailed Explanation (Existing SHAP & Factors) */}
+        {showDetailedExplanation && (
+          <div className="pt-4 border-t border-slate-800 space-y-4 animate-fade-in">
+            <ExplainabilityPanel
+              shapData={recommendation.shapExplanation}
+              factors={recommendation.explainabilityFactors}
+              decisionFactors={recommendation.decisionFactors}
+              predictedAdherence={recommendation.predictedAdherence}
+              healthSuitability={recommendation.healthSuitabilityScore ?? recommendation.suitabilityScore}
+              title="Transparent Model Attribution"
+              subtitle="Dual-layer explainability: ML Adherence Prediction (SHAP) and Multi-Factor Decision Intelligence Engine"
+            />
+          </div>
+        )}
+      </section>
+
+      {/* SECTION 5 — BEHAVIOR INSIGHT */}
+      <section className="bg-[#121215] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+              Personal Behavioral Insight
+            </h2>
+          </div>
+          <button
+            onClick={() => setActiveModule('insights')}
+            className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors"
+          >
+            <span>View all behavior insights</span>
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800/70 text-xs text-slate-300 leading-relaxed space-y-1.5">
+          <p className="font-medium text-slate-200">
+            {behaviorSummary?.keyObservation || 'Your session completion rate is consistently higher for workouts under 30 minutes in duration.'}
+          </p>
+          <p className="text-slate-400 text-[11px]">
+            Synthesized from your personal outcome logs and context trends. HealthPilot factors this pattern into daily duration scheduling.
+          </p>
+        </div>
+      </section>
+
+      {/* SECTION 6 — DAILY TRACKING */}
+      <section className="bg-[#121215] border border-slate-800 rounded-2xl p-5 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <h2 className="text-sm sm:text-base font-bold text-white tracking-tight">
+            Daily Habits & Tracking
+          </h2>
+          <span className="text-xs text-slate-400">
+            Today's Logged State
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Hydration Tracking */}
+          <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
                 <Droplets className="w-4 h-4 text-cyan-400" />
-                <span>Hydration Tracking</span>
+                <span>Hydration</span>
               </div>
-              <span className="font-mono font-bold text-cyan-400">{context.hydrationLiters}L / 2.5L</span>
+              <span className="text-xs font-mono font-bold text-cyan-400">
+                {context.hydrationLiters}L / 2.5L
+              </span>
             </div>
-            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden mb-2">
+            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-cyan-500 rounded-full transition-all duration-300"
                 style={{ width: `${Math.min(100, (context.hydrationLiters / 2.5) * 100)}%` }}
@@ -481,228 +539,112 @@ export const TodayView: React.FC = () => {
             </div>
             <button
               onClick={handleQuickHydration}
-              className="w-full py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+              className="w-full py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Log +250ml Water</span>
             </button>
           </div>
-        </div>
 
-        {/* Card 2: Evolving State & Behavioral Precedent */}
-        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white tracking-tight">Evolving Multi-Domain State</h3>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-medium">
-              System Estimate
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            <AdherenceMeter
-              score={evolvingState.recoveryReadiness}
-              label={`Recovery Status: ${(evolvingState.recoveryLevel || 'Moderate').toUpperCase()}`}
-              subtitle="Autonomic estimate synthesizing sleep, energy, fatigue, and soreness"
-            />
-
-            <div className="space-y-2 pt-2 border-t border-slate-800 text-xs">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400">Energy State:</span>
-                <span className="font-bold text-slate-200 capitalize">{evolvingState.energyState || 'Moderate'}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400">Behavioral Momentum:</span>
-                <span className="font-mono font-bold text-slate-200">{evolvingState.behavioralMomentum} / 100</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400">7-Day Completion Rate:</span>
-                <span className="font-mono font-bold text-emerald-400">{evolvingState.weeklyAdherenceRate}%</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400">Dominant Failure Barrier:</span>
-                <span className="font-medium text-rose-400">{evolvingState.dominantBarrier}</span>
-              </div>
+          {/* Action Notes & Nutrition */}
+          <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800/80 space-y-2.5 text-xs">
+            <div className="flex items-center justify-between font-semibold text-slate-200">
+              <span>Nutrition & Recovery Plan</span>
+              <span className="text-[10px] text-slate-400 font-mono">{recommendation.nutritionAction.timing}</span>
             </div>
-
-            {/* Behavioral Pattern Callout */}
-            {behaviorSummary && (
-              <div className="p-3 bg-slate-800/40 rounded-lg border border-white/5 text-xs space-y-1">
-                <div className="flex items-center gap-1 text-emerald-400 font-bold">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Empirical Insight</span>
-                </div>
-                <p className="text-[11px] leading-relaxed text-slate-300">
-                  {behaviorSummary.keyObservation}
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Card 3: Why It Was Recommended & Actions */}
-        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 space-y-3.5 flex flex-col justify-between">
-          <div className="space-y-3">
-            <h3 className="text-sm font-bold text-white tracking-tight">Decision Rationale</h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              {recommendation.whyRecommended}
+            <p className="text-slate-300 text-[11px] leading-relaxed">
+              {recommendation.nutritionAction.description}
             </p>
-
-            <div className="p-3 bg-slate-800/40 rounded-lg border border-white/5 space-y-1.5 text-xs">
-              <div className="font-bold text-slate-200 flex items-center justify-between">
-                <span>Nutrition Action</span>
-                <span className="text-[10px] text-slate-400 font-normal">{recommendation.nutritionAction.timing}</span>
-              </div>
-              <p className="text-slate-400 text-[11px] leading-relaxed">
-                {recommendation.nutritionAction.description}
-              </p>
+            <div className="pt-2 border-t border-slate-800 text-slate-400 text-[11px]">
+              <strong className="text-slate-300">Recovery:</strong> {recommendation.recoveryAction.description}
             </div>
-
-            <div className="p-3 bg-slate-800/40 rounded-lg border border-white/5 space-y-1 text-xs">
-              <div className="font-bold text-slate-200">Recovery Action</div>
-              <p className="text-slate-400 text-[11px] leading-relaxed">
-                {recommendation.recoveryAction.description}
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs">
-            <button
-              onClick={() => setActiveModule('what_if')}
-              className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1"
-            >
-              <span>Test in What-If Lab</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-            <button
-              onClick={() => setActiveModule('coach')}
-              className="text-slate-400 hover:text-white font-medium"
-            >
-              Ask AI Coach
-            </button>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Real Explainable AI: Dual-Layer ML Adherence (SHAP) & Recommendation Decision (5 Factors) */}
-      <ExplainabilityPanel
-        shapData={recommendation.shapExplanation}
-        factors={recommendation.explainabilityFactors}
-        decisionFactors={recommendation.decisionFactors}
-        predictedAdherence={recommendation.predictedAdherence}
-        healthSuitability={recommendation.healthSuitabilityScore ?? recommendation.suitabilityScore}
-        title="Transparent AI Decision & Predictive Explainability"
-        subtitle="Dual-layer explainability: ML Adherence Prediction (SHAP) and Multi-Factor Decision Intelligence Engine"
-      />
-
-      {/* Machine Learning Pipeline Audit & Provenance */}
-      <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-4 sm:p-5 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-              <Cpu className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-bold text-white tracking-tight">Adherence ML Pipeline Audit</h3>
+      {/* SECTION 7 — ADVANCED DETAILS (Collapsible Progressive Disclosure) */}
+      <section className="pt-2">
+        <Accordion
+          title="Advanced Decision Details"
+          subtitle="Model metadata, decision weight breakdown, and machine learning pipeline audit"
+          icon={<Cpu className="w-4 h-4 text-cyan-400" />}
+          badge={<span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">Audit</span>}
+          variant="card"
+        >
+          <div className="space-y-5 pt-2">
+            {/* Machine Learning Pipeline Audit & Provenance */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-slate-200 uppercase tracking-wider text-[11px]">
+                  Machine Learning Pipeline Audit
+                </span>
                 <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
                   recommendation.isModelPlaceholder
                     ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                     : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
                 }`}>
-                  {recommendation.isModelPlaceholder
-                    ? 'Fallback Heuristic'
-                    : recommendation.dataSourceLabel?.includes('seed')
-                      ? 'Demonstration Seed ML'
-                      : 'Real Trained ML'}
+                  {recommendation.isModelPlaceholder ? 'Heuristic Fallback' : 'Active Model'}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Statistically evaluated binary classification model trained with scikit-learn
-              </p>
-            </div>
-          </div>
 
-          <button
-            onClick={() => setActiveModule('behavior')}
-            className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 self-start sm:self-auto"
-          >
-            <span>View Benchmark & Comparison</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-1">
-          <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800/80 space-y-1">
-            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block font-semibold">Active Model</span>
-            <div className="text-white font-bold">{recommendation.modelName || 'Logistic Regression (balanced)'}</div>
-            <div className="text-[10px] text-slate-400">Version: {recommendation.modelVersion || '1.0.0-prototype'}</div>
-          </div>
-
-          <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800/80 space-y-1">
-            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block font-semibold">Training Source</span>
-            <div className="text-white font-medium truncate">{recommendation.dataSourceLabel || 'Demonstration seed data'}</div>
-            <div className="text-[10px] text-emerald-400/90 font-mono">Zero Target Leakage (Pre-Intervention)</div>
-          </div>
-
-          <div className="p-3 bg-slate-900/60 rounded-lg border border-slate-800/80 space-y-1">
-            <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400 block font-semibold">Confidence & Notice</span>
-            <div className="text-slate-300 text-[11px] leading-relaxed">
-              {recommendation.limitationNotice || 'Subject to continuous cross-validation against outcome records.'}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Alternative Candidate Options */}
-      <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-bold text-white tracking-tight">Alternative Candidate Options Considered</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              The Decision Engine ranked these alternatives lower based on predicted adherence and physiological suitability
-            </p>
-          </div>
-          <button
-            onClick={() => setActiveModule('plan_lab')}
-            className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
-          >
-            <span>Compare in Plan Lab</span>
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
-          {recommendation.alternatives.map((alt) => (
-            <div
-              key={alt.id}
-              className="p-4 rounded-xl border border-slate-800 hover:border-emerald-500/40 transition-colors bg-slate-800/30 space-y-2.5"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <h4 className="text-xs font-bold text-white">{alt.title}</h4>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 font-semibold shrink-0">
-                  {alt.durationMinutes}m
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed">
-                {alt.rationale}
-              </p>
-              <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                <span className="text-slate-400">
-                  Adherence: <strong className="font-mono text-slate-200">{alt.predictedAdherence}%</strong>
-                </span>
-                <span className="text-slate-400">
-                  Suitability: <strong className="font-mono text-slate-200">{alt.healthSuitabilityScore}%</strong>
-                </span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800/80 space-y-1">
+                  <span className="text-[10px] font-mono uppercase text-slate-500 block">Model Architecture</span>
+                  <div className="text-white font-bold">{recommendation.modelName || 'Logistic Regression (balanced)'}</div>
+                  <div className="text-[10px] text-slate-400 font-mono">v{recommendation.modelVersion || '1.0.0-production'}</div>
+                </div>
+                <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800/80 space-y-1">
+                  <span className="text-[10px] font-mono uppercase text-slate-500 block">Training Source</span>
+                  <div className="text-white font-medium truncate">{recommendation.dataSourceLabel || 'Personal historical log'}</div>
+                  <div className="text-[10px] text-emerald-400 font-mono">Zero Target Leakage Enforced</div>
+                </div>
+                <div className="p-3 bg-slate-900/80 rounded-lg border border-slate-800/80 space-y-1">
+                  <span className="text-[10px] font-mono uppercase text-slate-500 block">Limitation Notice</span>
+                  <div className="text-slate-300 text-[11px] leading-relaxed">
+                    {recommendation.limitationNotice || 'Continuous cross-validation against daily logged outcomes.'}
+                  </div>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+
+            {/* Score Breakdown Table */}
+            {recommendation.scoreBreakdown && (
+              <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                <span className="font-semibold text-slate-200 text-xs block">
+                  Weighted Score Composition (Final Utility: {recommendation.finalDecisionScore}/100)
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-[11px]">
+                  <div className="p-2 bg-slate-900/60 rounded border border-slate-800 text-slate-300">
+                    <span className="text-slate-500 block text-[10px]">Suitability (30%)</span>
+                    +{recommendation.scoreBreakdown.suitabilityContribution} pts
+                  </div>
+                  <div className="p-2 bg-slate-900/60 rounded border border-slate-800 text-slate-300">
+                    <span className="text-slate-500 block text-[10px]">Adherence (25%)</span>
+                    +{recommendation.scoreBreakdown.predictedAdherenceContribution} pts
+                  </div>
+                  <div className="p-2 bg-slate-900/60 rounded border border-slate-800 text-slate-300">
+                    <span className="text-slate-500 block text-[10px]">Alignment (20%)</span>
+                    +{recommendation.scoreBreakdown.goalAlignmentContribution} pts
+                  </div>
+                  <div className="p-2 bg-slate-900/60 rounded border border-slate-800 text-slate-300">
+                    <span className="text-slate-500 block text-[10px]">Feasibility (15%)</span>
+                    +{recommendation.scoreBreakdown.contextFeasibilityContribution} pts
+                  </div>
+                  <div className="p-2 bg-slate-900/60 rounded border border-slate-800 text-slate-300">
+                    <span className="text-slate-500 block text-[10px]">Behavioral Fit (10%)</span>
+                    +{recommendation.scoreBreakdown.behavioralFitContribution} pts
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </Accordion>
+      </section>
 
       {/* Record Outcome Modal */}
       {logModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs">
-          <div className="bg-[#0F0F11] rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-800 space-y-4 text-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs">
+          <div className="bg-[#121215] rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-800 space-y-4 text-slate-200">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
                 <h3 className="text-base font-bold text-white">Record Recommendation Outcome</h3>
@@ -756,51 +698,44 @@ export const TodayView: React.FC = () => {
                 </div>
               </div>
 
-              {outcomeStatus !== 'skipped' && (
-                <div>
-                  <label className="block font-semibold text-slate-300 mb-1">
-                    Actual Duration Completed: <span className="font-mono text-emerald-400">{actualDuration} mins</span>
-                  </label>
-                  <input
-                    type="range"
-                    min="5"
-                    max="90"
-                    step="5"
-                    value={actualDuration}
-                    onChange={(e) => setActualDuration(Number(e.target.value))}
-                    className="w-full accent-emerald-500"
-                  />
-                </div>
-              )}
+              <div>
+                <label className="block font-semibold text-slate-300 mb-1">Actual Duration (Minutes)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="180"
+                  value={actualDuration}
+                  onChange={e => setActualDuration(Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white font-mono focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
 
               {outcomeStatus !== 'completed' && (
                 <div>
-                  <label className="block font-semibold text-slate-300 mb-1">Primary Barrier / Reason</label>
+                  <label className="block font-semibold text-slate-300 mb-1">Primary Barrier or Reason</label>
                   <select
                     value={skipReason}
-                    onChange={(e) => setSkipReason(e.target.value as any)}
-                    className="w-full p-2 rounded-lg border border-slate-700 text-slate-200 bg-slate-900"
+                    onChange={e => setSkipReason(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white focus:border-emerald-500 focus:outline-none"
                   >
-                    <option value="too_tired">Too Tired / Excessive Fatigue</option>
-                    <option value="no_time">No Time / Compressed Schedule</option>
-                    <option value="too_difficult">Too Difficult / Intimidating</option>
-                    <option value="schedule_changed">Schedule Changed / Emergency</option>
-                    <option value="discomfort">Physical Discomfort / Tightness</option>
-                    <option value="equipment_unavailable">Equipment Unavailable</option>
-                    <option value="not_enjoyed">Did Not Enjoy Activity</option>
-                    <option value="other">Other Reason</option>
+                    <option value="too_tired">Excessive Fatigue / Low Energy</option>
+                    <option value="time_constraint">Unscheduled Time Constraint</option>
+                    <option value="soreness_pain">Muscle Soreness or Joint Discomfort</option>
+                    <option value="work_conflict">Work / Family Conflict</option>
+                    <option value="low_motivation">Low Motivation / Stress</option>
+                    <option value="other">Other / Traveling</option>
                   </select>
                 </div>
               )}
 
               <div>
-                <label className="block font-semibold text-slate-300 mb-1">User Feedback & Qualitative Notes</label>
+                <label className="block font-semibold text-slate-300 mb-1">Session Notes (Optional)</label>
                 <textarea
                   rows={2}
                   value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                  placeholder="How did your body respond? E.g., Spine felt loose, or couldn't get into rhythm."
-                  className="w-full p-2.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-200 placeholder:text-slate-500 focus:outline-emerald-500"
+                  onChange={e => setFeedback(e.target.value)}
+                  placeholder="How did your session feel? Any pain or adjustments?"
+                  className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white focus:border-emerald-500 focus:outline-none"
                 />
               </div>
 
@@ -808,16 +743,16 @@ export const TodayView: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setLogModalOpen(false)}
-                  className="px-4 py-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white font-medium"
+                  className="px-4 py-2 rounded-lg border border-slate-800 text-slate-300 hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#0A0A0B] font-bold transition-colors disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#0A0A0B] font-bold disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Updating Model...' : 'Save & Update State'}
+                  {isSubmitting ? 'Saving...' : 'Confirm Log'}
                 </button>
               </div>
             </form>

@@ -29,17 +29,19 @@ export const TodayStateSummary: React.FC<TodayStateSummaryProps> = ({
   onNavigateToModule
 }) => {
   // Derive qualitative levels with fallbacks
-  const recoveryScore = context.recoveryScore ?? evolvingState.recoveryReadiness ?? 50;
-  const recoveryStatus = context.recoveryStatus ?? (recoveryScore >= 70 ? 'good' : recoveryScore < 48 ? 'low' : 'moderate');
+  const recoveryScore = context?.recoveryScore ?? evolvingState?.recoveryReadiness ?? 50;
+  const recoveryStatus = context?.recoveryStatus ?? (recoveryScore >= 70 ? 'good' : recoveryScore < 48 ? 'low' : 'moderate');
 
-  const energyLevel = context.energyLevel ?? context.energy ?? 5;
+  const energyLevel = context?.energyLevel ?? context?.energy ?? 5;
   const energyStatus: 'high' | 'moderate' | 'low' = energyLevel >= 7 ? 'high' : energyLevel <= 4 ? 'low' : 'moderate';
 
-  const fatigueLevel = context.fatigueLevel ?? context.fatigue ?? 5;
+  const fatigueLevel = context?.fatigueLevel ?? context?.fatigue ?? 5;
   const fatigueStatus: 'high' | 'moderate' | 'low' = fatigueLevel >= 7 ? 'high' : fatigueLevel <= 3 ? 'low' : 'moderate';
 
-  const stressLevel = context.stressLevel ?? context.stress ?? 5;
+  const stressLevel = context?.stressLevel ?? context?.stress ?? 5;
   const stressStatus: 'high' | 'moderate' | 'low' = stressLevel >= 7 ? 'high' : stressLevel <= 3 ? 'low' : 'moderate';
+
+  const sleepHours = context?.sleepHours ?? 7;
 
   // Check goal-condition conflict
   const primaryGoal = goals.find(g => g.priority === 'primary') || goals[0];
@@ -75,8 +77,8 @@ export const TodayStateSummary: React.FC<TodayStateSummaryProps> = ({
 
   // Explanation string
   const explanation =
-    evolvingState.stateExplanation ||
-    `Sleep duration of ${context.sleepHours.toFixed(1)}h with ${energyStatus} energy (${energyLevel}/10) and ${fatigueStatus} fatigue (${fatigueLevel}/10) yields an autonomic recovery readiness estimate of ${recoveryScore}%. ${
+    evolvingState?.stateExplanation ||
+    `Sleep duration of ${Number(sleepHours).toFixed(1)}h with ${energyStatus} energy (${energyLevel}/10) and ${fatigueStatus} fatigue (${fatigueLevel}/10) yields an autonomic recovery readiness estimate of ${recoveryScore}%. ${
       recoveryStatus === 'low'
         ? 'Restorative pacing and down-regulation are indicated to prevent systemic overreaching.'
         : recoveryStatus === 'good'

@@ -29,37 +29,42 @@ export const Sidebar: React.FC<SidebarProps> = ({ mobileOpen, setMobileOpen }) =
 
   const navGroups = [
     {
-      title: 'Daily Intelligence',
+      title: 'Core',
       items: [
         { id: 'today', label: 'Today', icon: Compass, badge: recommendation ? 'Decision Ready' : undefined },
         { id: 'context', label: 'My Context', icon: Sliders },
+        { id: 'adaptive_plan', label: 'Adaptive Plan', icon: CalendarDays },
+        { id: 'journal', label: 'Outcome Journal', icon: CheckCircle2 }
+      ]
+    },
+    {
+      title: 'Insights',
+      items: [
+        { id: 'insights', label: 'Behavior Insights', icon: Brain },
+        { id: 'progress', label: 'Progress', icon: TrendingUp },
+        { id: 'history', label: 'Recommendation History', icon: History }
+      ]
+    },
+    {
+      title: 'Decision Lab',
+      items: [
+        { id: 'plan_lab', label: 'Plan Lab', icon: Layers },
+        { id: 'what_if', label: 'What-If Lab', icon: FlaskConical, badge: 'XAI' },
+        { id: 'goals', label: 'Goal Strategy', icon: Target },
+        { id: 'conflicts', label: 'Goal Conflicts', icon: AlertTriangle, badge: recommendation?.goalConflict.hasConflict ? 'Active' : undefined, badgeColor: 'amber' }
+      ]
+    },
+    {
+      title: 'AI',
+      items: [
         { id: 'coach', label: 'AI Coach', icon: Sparkles, highlight: true }
       ]
     },
     {
-      title: 'Decision & Research Lab',
+      title: 'System',
       items: [
-        { id: 'what_if', label: 'What-If Lab', icon: FlaskConical, badge: 'XAI' },
-        { id: 'plan_lab', label: 'Plan Lab', icon: Layers },
-        { id: 'conflicts', label: 'Goal Conflicts', icon: AlertTriangle, badge: recommendation?.goalConflict.hasConflict ? '1 Active' : undefined, badgeColor: 'amber' },
-        { id: 'evaluation', label: 'Evaluation', icon: ShieldCheck, badge: 'Audit' }
-      ]
-    },
-    {
-      title: 'Behavior & Analytics',
-      items: [
-        { id: 'insights', label: 'Behavior Insights', icon: Brain },
-        { id: 'journal', label: 'Outcome Journal', icon: CheckCircle2 },
-        { id: 'history', label: 'Recommendation History', icon: History },
-        { id: 'progress', label: 'Progress', icon: TrendingUp }
-      ]
-    },
-    {
-      title: 'Strategy & Configuration',
-      items: [
-        { id: 'adaptive_plan', label: 'Adaptive Plan', icon: CalendarDays },
-        { id: 'goals', label: 'Goal Strategy', icon: Target },
-        { id: 'settings', label: 'Settings', icon: Settings2 }
+        { id: 'settings', label: 'Settings', icon: Settings2 },
+        { id: 'evaluation', label: 'Evaluation', icon: ShieldCheck, badge: 'Research' }
       ]
     }
   ];

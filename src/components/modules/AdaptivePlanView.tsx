@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useHealthPilot } from '../../context/HealthPilotContext.js';
 import {
   CalendarDays,
@@ -10,14 +10,12 @@ import {
   Sliders,
   History,
   ShieldCheck,
-  TrendingUp,
-  ArrowRight,
   Sparkles,
-  Info,
-  Layers,
-  Dumbbell
+  ArrowRight,
+  TrendingUp
 } from 'lucide-react';
 import { MetricBadge } from '../common/MetricBadge.js';
+import { Accordion } from '../common/Accordion.js';
 
 export const AdaptivePlanView: React.FC = () => {
   const {
@@ -30,11 +28,10 @@ export const AdaptivePlanView: React.FC = () => {
     setActiveModule
   } = useHealthPilot();
 
-  const [activeTab, setActiveTab] = useState<'schedule' | 'comparison' | 'audit_trail'>('schedule');
-
   // Days list: prioritize adaptivePlanPayload.days if present, otherwise adaptivePlan
-  const days = adaptivePlanPayload?.days || adaptivePlan;
-  const adaptationEvents = adaptivePlanPayload?.adaptationEvents || [];
+  const rawDays = adaptivePlanPayload?.days || adaptivePlan;
+  const days = Array.isArray(rawDays) ? rawDays : [];
+  const adaptationEvents = Array.isArray(adaptivePlanPayload?.adaptationEvents) ? adaptivePlanPayload.adaptationEvents : [];
   const activeAdaptationsCount = adaptivePlanPayload?.activeAdaptationsCount ?? days.filter(d => d.status === 'adapted').length;
   const momentumScore = evolvingState?.behavioralMomentum ?? 65;
   const momentumLabel = evolvingState?.behavioralMomentumLabel || (momentumScore >= 75 ? 'Strong' : momentumScore >= 45 ? 'Moderate' : 'Low');
@@ -55,15 +52,15 @@ export const AdaptivePlanView: React.FC = () => {
             Adaptive Microcycle & Training Schedule
           </h2>
           <p className="text-xs text-slate-400 max-w-2xl leading-relaxed mt-1">
-            Unlike static rigid calendars that accumulate guilt when life gets in the way, HealthPilot AI dynamically
-            rebalances upcoming training sessions based on logged recovery, fatigue, and barriers, while strictly preserving your primary long-term goals.
+            Unlike static rigid calendars that accumulate guilt when unexpected constraints arise, HealthPilot AI dynamically
+            rebalances upcoming training sessions based on logged recovery and barriers, while strictly preserving your primary goals.
           </p>
         </div>
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <button
-            onClick={() => setActiveModule('outcome_journal')}
+            onClick={() => setActiveModule('journal')}
             className="px-3.5 py-2 rounded-lg text-xs font-semibold text-slate-300 bg-slate-900 hover:bg-slate-800 border border-slate-700 transition-colors"
           >
             Log New Outcome
@@ -90,7 +87,7 @@ export const AdaptivePlanView: React.FC = () => {
         </div>
       </div>
 
-      {/* Overview Stat Badges */}
+      {/* Summary KPI Badges */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-4 space-y-1">
           <div className="flex items-center justify-between">
@@ -126,7 +123,7 @@ export const AdaptivePlanView: React.FC = () => {
             <span className="text-[10px] font-mono text-emerald-400">Protected</span>
           </div>
           <div className="text-sm font-bold text-slate-200 truncate">10K Aerobic & Functional</div>
-          <p className="text-[11px] text-slate-400">Preserved stimulus shifted to Friday & Saturday.</p>
+          <p className="text-[11px] text-slate-400">Preserved stimulus shifted to buffer blocks.</p>
         </div>
 
         <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-4 space-y-1">
@@ -135,52 +132,25 @@ export const AdaptivePlanView: React.FC = () => {
             <span className="text-[10px] font-mono text-teal-400">Transparent</span>
           </div>
           <div className="text-sm font-bold text-slate-200">Rule & Metric Driven</div>
-          <p className="text-[11px] text-slate-400">Zero black-box or uncontrolled stochastic shifts.</p>
+          <p className="text-[11px] text-slate-400">Zero uninspected black-box drift.</p>
         </div>
       </div>
 
-      {/* Navigation Tabs */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-        <button
-          onClick={() => setActiveTab('schedule')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
-            activeTab === 'schedule'
-              ? 'bg-slate-800 text-white shadow-xs'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <CalendarDays className="w-4 h-4 text-emerald-400" />
-          <span>7-Day Adaptive Schedule</span>
-        </button>
+      {/* 1. CURRENT ADAPTIVE SCHEDULE */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <CalendarDays className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+              1. Current Adaptive Schedule
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-slate-500">
+            7-Day Microcycle Overview
+          </span>
+        </div>
 
-        <button
-          onClick={() => setActiveTab('comparison')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
-            activeTab === 'comparison'
-              ? 'bg-slate-800 text-white shadow-xs'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <Sliders className="w-4 h-4 text-indigo-400" />
-          <span>Baseline vs. Adapted Diff</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('audit_trail')}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-colors ${
-            activeTab === 'audit_trail'
-              ? 'bg-slate-800 text-white shadow-xs'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-          }`}
-        >
-          <History className="w-4 h-4 text-amber-400" />
-          <span>Adaptation Event History ({adaptationEvents.length})</span>
-        </button>
-      </div>
-
-      {/* TAB 1: 7-DAY ADAPTIVE SCHEDULE */}
-      {activeTab === 'schedule' && (
-        <div className="space-y-3.5">
+        <div className="space-y-3">
           {days.map((day) => {
             const isToday = day.dayName === 'Wednesday';
             const isAdapted = day.status === 'adapted';
@@ -189,7 +159,7 @@ export const AdaptivePlanView: React.FC = () => {
             return (
               <div
                 key={day.id}
-                className={`bg-[#0F0F11] border rounded-xl p-5 transition-all shadow-xs space-y-3 ${
+                className={`bg-[#0F0F11] border rounded-xl p-4.5 transition-all shadow-xs space-y-3 ${
                   isToday
                     ? 'border-emerald-500/50 bg-emerald-500/5 ring-1 ring-emerald-500/20'
                     : isAdapted
@@ -201,7 +171,7 @@ export const AdaptivePlanView: React.FC = () => {
                   <div className="flex items-start sm:items-center gap-3.5">
                     {/* Date Block */}
                     <div
-                      className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 ${
+                      className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center shrink-0 ${
                         isToday
                           ? 'bg-emerald-500 text-[#0A0A0B] font-bold shadow-xs'
                           : isCompleted
@@ -211,8 +181,8 @@ export const AdaptivePlanView: React.FC = () => {
                           : 'bg-slate-800 text-slate-300 border border-slate-700'
                       }`}
                     >
-                      <span className="text-[10px] font-bold uppercase tracking-wider">{day.dayName.slice(0, 3)}</span>
-                      <span className="text-xs font-mono font-extrabold">{day.date.split('-')[2] || '10'}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider">{(day.dayName || 'Day').slice(0, 3)}</span>
+                      <span className="text-xs font-mono font-extrabold">{(day.date || '').split('-')[2] || '10'}</span>
                     </div>
 
                     {/* Session Name & Badges */}
@@ -302,74 +272,29 @@ export const AdaptivePlanView: React.FC = () => {
                         {day.goalPreserved || 'Aerobic stimulus redistributed to weekend microcycle; no volume deleted.'}
                       </div>
                     </div>
-
-                    {/* 5 Decision Factors Adaptation Justification */}
-                    <div className="pt-2 border-t border-amber-500/20 space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px]">
-                        <span className="font-bold text-amber-300 flex items-center gap-1">
-                          <Sliders className="w-3 h-3 text-amber-400" />
-                          <span>Decision Factors That Justified This Adaptation:</span>
-                        </span>
-                        <span className="font-mono text-[10px] text-amber-300/80">
-                          Engine Rebalance Score: 88/100
-                        </span>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-1.5 text-[10px]">
-                        <div className="p-1.5 rounded bg-slate-900/80 border border-amber-500/20">
-                          <div className="font-bold text-slate-200">1. Health Suitability (30%)</div>
-                          <div className="text-emerald-400 font-mono font-semibold">+28.8%</div>
-                          <p className="text-slate-400 mt-0.5">Downscaled intensity protects autonomic recovery.</p>
-                        </div>
-
-                        <div className="p-1.5 rounded bg-slate-900/80 border border-amber-500/20">
-                          <div className="font-bold text-slate-200">2. Predicted Adherence (25%)</div>
-                          <div className="text-emerald-400 font-mono font-semibold">+21.0%</div>
-                          <p className="text-slate-400 mt-0.5">ML model predicted 84% vs 38% for original session.</p>
-                        </div>
-
-                        <div className="p-1.5 rounded bg-slate-900/80 border border-amber-500/20">
-                          <div className="font-bold text-slate-200">3. Goal Alignment (20%)</div>
-                          <div className="text-emerald-400 font-mono font-semibold">+16.4%</div>
-                          <p className="text-slate-400 mt-0.5">Defers aerobic target without deleting weekly stimulus.</p>
-                        </div>
-
-                        <div className="p-1.5 rounded bg-slate-900/80 border border-amber-500/20">
-                          <div className="font-bold text-slate-200">4. Context Feasibility (15%)</div>
-                          <div className="text-emerald-400 font-mono font-semibold">+14.2%</div>
-                          <p className="text-slate-400 mt-0.5">Fits easily within restricted schedule window.</p>
-                        </div>
-
-                        <div className="p-1.5 rounded bg-slate-900/80 border border-amber-500/20">
-                          <div className="font-bold text-slate-200">5. Behavioral Fit (10%)</div>
-                          <div className="text-emerald-400 font-mono font-semibold">+8.5%</div>
-                          <p className="text-slate-400 mt-0.5">High historical adherence for home recovery routine.</p>
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 )}
               </div>
             );
           })}
         </div>
-      )}
+      </div>
 
-      {/* TAB 2: BASELINE VS. ADAPTED COMPARISON (DIFF VIEW) */}
-      {activeTab === 'comparison' && (
-        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-white">Baseline vs. Current Adapted Schedule</h3>
-              <p className="text-xs text-slate-400">
-                Transparent view showing every modification made to the initial weekly plan.
-              </p>
-            </div>
-            <span className="text-xs font-mono text-emerald-400">
-              {activeAdaptationsCount} Modifications
-            </span>
+      {/* 2. BASELINE VS. ADAPTED COMPARISON (DIFF VIEW) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-4 h-4 text-indigo-400" />
+            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+              2. Baseline vs. Adapted Schedule Comparison
+            </h3>
           </div>
+          <span className="text-xs font-mono text-amber-400">
+            {activeAdaptationsCount} Modifications
+          </span>
+        </div>
 
+        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="text-[11px] uppercase font-mono text-slate-500 border-b border-slate-800">
@@ -447,117 +372,124 @@ export const AdaptivePlanView: React.FC = () => {
             </table>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* TAB 3: ADAPTATION EVENT AUDIT TRAIL */}
-      {activeTab === 'audit_trail' && (
-        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 space-y-4 shadow-xs">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-            <div>
-              <h3 className="text-sm font-bold text-white">Continuous Adaptation Audit Trail</h3>
-              <p className="text-xs text-slate-400">
-                Full chronological history of scheduling adaptations, triggering evidence, and long-term goal guarantees.
-              </p>
-            </div>
-            <span className="text-xs font-mono text-amber-400">
-              {adaptationEvents.length} Recorded Adaptations
-            </span>
+      {/* 3. AUDIT TRAIL & REBALANCING PRINCIPLES (COLLAPSIBLE) */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-slate-400" />
+            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+              3. Adaptation History & Rebalancing Principles
+            </h3>
           </div>
+        </div>
 
-          {adaptationEvents.length === 0 ? (
-            <div className="text-center py-8 text-slate-500 text-xs">
-              No adaptation events recorded yet. Plan is running on baseline schedule.
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {adaptationEvents.map((evt) => (
-                <div
-                  key={evt.id}
-                  className="p-4 rounded-lg bg-slate-900 border border-slate-800 space-y-2.5"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[10px] font-bold">
-                        {evt.ruleApplied.replace('_', ' ').toUpperCase()}
-                      </span>
-                      <span className="text-xs font-bold text-white">{evt.dayName}</span>
+        <Accordion
+          allowMultiple
+          items={[
+            {
+              id: 'adaptation-events',
+              title: `Adaptation Event History & Triggering Evidence (${adaptationEvents.length})`,
+              subtitle: 'Full chronological audit trail of microcycle adjustments and safety guarantees',
+              badge: `${adaptationEvents.length} Events`,
+              content: (
+                <div className="space-y-3">
+                  {adaptationEvents.length === 0 ? (
+                    <div className="text-center py-6 text-slate-500 text-xs">
+                      No adaptation events recorded yet. Plan is running on baseline schedule.
                     </div>
-                    <span className="text-[11px] font-mono text-slate-500">{evt.timestamp}</span>
+                  ) : (
+                    <div className="space-y-3">
+                      {adaptationEvents.map((evt) => (
+                        <div
+                          key={evt.id}
+                          className="p-4 rounded-lg bg-slate-900 border border-slate-800 space-y-2.5"
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800/80 pb-2">
+                            <div className="flex items-center gap-2">
+                              <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[10px] font-bold">
+                                {evt.ruleApplied.replace('_', ' ').toUpperCase()}
+                              </span>
+                              <span className="text-xs font-bold text-white">{evt.dayName}</span>
+                            </div>
+                            <span className="text-[11px] font-mono text-slate-500">{evt.timestamp}</span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <span className="text-slate-400 block text-[11px]">Previous Scheduled Session:</span>
+                              <span className="text-slate-300 font-medium line-through">
+                                {evt.previousSession.plannedSession} ({evt.previousSession.durationMinutes}m)
+                              </span>
+                            </div>
+
+                            <div>
+                              <span className="text-emerald-400 block text-[11px]">Adapted Intervention:</span>
+                              <span className="text-white font-bold">
+                                {evt.adaptedSession.plannedSession} ({evt.adaptedSession.durationMinutes}m)
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="p-2.5 bg-slate-800/60 rounded border border-slate-700/60 text-xs space-y-1">
+                            <div>
+                              <strong className="text-amber-400 text-[11px]">Triggering Evidence:</strong>{' '}
+                              <span className="text-slate-300">{evt.triggeringEvidence}</span>
+                            </div>
+                            <div>
+                              <strong className="text-emerald-400 text-[11px]">Goal Preserved:</strong>{' '}
+                              <span className="text-slate-300">{evt.goalPreserved}</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            },
+            {
+              id: 'principles',
+              title: 'Microcycle Rebalancing Principles & Guardrails',
+              subtitle: 'Mathematical rules preventing plan degradation while maintaining training stimulus',
+              badge: '3 Core Guardrails',
+              content: (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-300 leading-relaxed pt-1">
+                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 space-y-1">
+                    <h4 className="font-bold text-white flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-emerald-400" />
+                      1. Evidence-Based Pivot
+                    </h4>
+                    <p className="text-slate-400">
+                      When fatigue &gt; 6 or sleep &lt; 6h is reported, strenuous intervals are deferred and replaced with restorative mobility.
+                    </p>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-slate-400 block text-[11px]">Previous Scheduled Session:</span>
-                      <span className="text-slate-300 font-medium line-through">
-                        {evt.previousSession.plannedSession} ({evt.previousSession.durationMinutes}m)
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-emerald-400 block text-[11px]">Adapted Intervention:</span>
-                      <span className="text-white font-bold">
-                        {evt.adaptedSession.plannedSession} ({evt.adaptedSession.durationMinutes}m)
-                      </span>
-                    </div>
+                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 space-y-1">
+                    <h4 className="font-bold text-white flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-indigo-400" />
+                      2. Barrier Compression
+                    </h4>
+                    <p className="text-slate-400">
+                      Repeated time constraints trigger session compression down to 20–25 minutes rather than letting workouts be skipped entirely.
+                    </p>
                   </div>
 
-                  <div className="p-2.5 bg-slate-800/60 rounded border border-slate-700/60 text-xs space-y-1">
-                    <div>
-                      <strong className="text-amber-400 text-[11px]">Triggering Evidence:</strong>{' '}
-                      <span className="text-slate-300">{evt.triggeringEvidence}</span>
-                    </div>
-                    <div>
-                      <strong className="text-emerald-400 text-[11px]">Goal Preserved:</strong>{' '}
-                      <span className="text-slate-300">{evt.goalPreserved}</span>
-                    </div>
+                  <div className="p-3 rounded-lg bg-slate-900/60 border border-slate-800 space-y-1">
+                    <h4 className="font-bold text-white flex items-center gap-1.5">
+                      <Sparkles className="w-3 h-3 text-amber-400" />
+                      3. Microcycle Redistribution
+                    </h4>
+                    <p className="text-slate-400">
+                      Volume is redistributed to weekend buffer blocks. Progress toward primary endurance and strength goals is preserved.
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Goal Preservation Methodology Banner */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-3">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-400" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-            HealthPilot AI Microcycle Rebalancing Principles
-          </h3>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-slate-300 leading-relaxed">
-          <div className="space-y-1">
-            <h4 className="font-bold text-white flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-emerald-400" />
-              1. Evidence-Based Pivot
-            </h4>
-            <p className="text-slate-400">
-              When fatigue &gt; 6 or sleep &lt; 6h is reported, high-intensity intervals are deferred and replaced with restorative mobility.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <h4 className="font-bold text-white flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-indigo-400" />
-              2. Barrier Compression
-            </h4>
-            <p className="text-slate-400">
-              Repeated time constraints trigger session compression down to 20–25 minutes rather than letting workouts be skipped entirely.
-            </p>
-          </div>
-
-          <div className="space-y-1">
-            <h4 className="font-bold text-white flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-amber-400" />
-              3. Microcycle Redistribution
-            </h4>
-            <p className="text-slate-400">
-              Volume is redistributed to weekend buffer blocks. Progress toward primary endurance and strength goals is preserved.
-            </p>
-          </div>
-        </div>
+              )
+            }
+          ]}
+        />
       </div>
     </div>
   );

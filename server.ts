@@ -6,6 +6,15 @@ import { decisionEngine, DecisionIntelligenceEngine } from './server/engine/deci
 import { mlService, AdherenceFeatureVector } from './server/ml/mlService.js';
 import { askAiCoach } from './server/gemini.js';
 import { evaluationService } from './server/engine/evaluationService.js';
+import {
+  requireAuth,
+  AuthenticatedRequest,
+  generateToken,
+  hashPassword,
+  comparePassword,
+  AuthUser
+} from './server/auth.js';
+import { connectMongoDB, isMongoDBConnected } from './server/db/mongoConnect.js';
 
 async function startServer() {
   const app = express();
@@ -13,29 +22,184 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Connect to persistent MongoDB storage if URI provided (non-blocking fallback to persistent file db)
+  connectMongoDB().catch(err => {
+    console.log('[Database] MongoDB background initialization check:', err.message);
+  });
+
   // Health check
   app.get('/api/health', (req, res) => {
     res.json({
       status: 'ok',
       service: 'HealthPilot AI Decision Intelligence System',
       version: '1.0.0-research',
+      mongoConnected: isMongoDBConnected(),
       timestamp: new Date().toISOString()
     });
   });
 
-  // User Profile
-  app.get('/api/user/profile', (req, res) => {
+  // ==========================================
+  // AUTHENTICATION & MULTI-USER IDENTITY
+  // ==========================================
+
+  // Signup
+  app.post('/api/auth/signup', async (req, res) => {
     try {
-      const profile = db.getUserProfile();
+      const { email, password, name } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required.' });
+      }
+      if (typeof email !== 'string' || !email.includes('@')) {
+        return res.status(400).json({ error: 'Please enter a valid email address.' });
+      }
+      if (typeof password !== 'string' || password.length < 6) {
+        return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+      }
+
+      const existingUser = db.findUserByEmail(email);
+      if (existingUser) {
+        return res.status(409).json({ error: 'An account with this email address already exists. Please log in.' });
+      }
+
+      const passwordHash = await hashPassword(password);
+      const user = db.createUser({
+        email: email.trim().toLowerCase(),
+        passwordHash,
+        name: name ? name.trim() : 'HealthPilot User',
+        role: 'user',
+        onboardingComplete: false
+      });
+
+      const authUser: AuthUser = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        onboardingComplete: user.onboardingComplete
+      };
+
+      const token = generateToken(authUser);
+      const profile = db.getUserProfile(user.id);
+
+      res.status(201).json({
+        success: true,
+        message: 'Account created successfully.',
+        token,
+        user: authUser,
+        profile
+      });
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      res.status(500).json({ error: err.message || 'Error creating account.' });
+    }
+  });
+
+  // Login
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required.' });
+      }
+
+      const user = db.findUserByEmail(email.trim().toLowerCase());
+      if (!user) {
+        return res.status(401).json({ error: 'Invalid email or password.' });
+      }
+
+      const isValid = await comparePassword(password, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ error: 'Invalid email or password.' });
+      }
+
+      const authUser: AuthUser = {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        onboardingComplete: user.onboardingComplete
+      };
+
+      const token = generateToken(authUser);
+      const profile = db.getUserProfile(user.id);
+
+      res.json({
+        success: true,
+        message: 'Logged in successfully.',
+        token,
+        user: authUser,
+        profile
+      });
+    } catch (err: any) {
+      console.error('Login error:', err);
+      res.status(500).json({ error: err.message || 'Error logging in.' });
+    }
+  });
+
+  // Current Authenticated User & Profile
+  app.get('/api/auth/me', requireAuth, (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const user = db.findUserById(userId);
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const profile = db.getUserProfile(userId);
+      res.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+          onboardingComplete: user.onboardingComplete
+        },
+        profile
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Logout
+  app.post('/api/auth/logout', (req, res) => {
+    res.json({ success: true, message: 'Logged out successfully.' });
+  });
+
+  // Complete / Update Onboarding
+  app.post('/api/auth/onboarding', requireAuth, (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const profileData = req.body;
+      const updatedProfile = db.updateUserProfile(userId, profileData);
+      db.updateUser(userId, { onboardingComplete: true });
+
+      res.json({
+        success: true,
+        message: 'Onboarding completed and profile updated.',
+        profile: updatedProfile,
+        onboardingComplete: true
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // User Profile
+  app.get('/api/user/profile', requireAuth, (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const profile = db.getUserProfile(userId);
       res.json(profile);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.put('/api/user/profile', (req, res) => {
+  app.put('/api/user/profile', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const updated = db.updateUserProfile(req.body);
+      const userId = req.userId!;
+      const updated = db.updateUserProfile(userId, req.body);
       res.json(updated);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -94,9 +258,10 @@ async function startServer() {
   };
 
   // Daily Context: Latest
-  app.get('/api/context/latest', (req, res) => {
+  app.get('/api/context/latest', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const context = db.getLatestDailyContext();
+      const userId = req.userId!;
+      const context = db.getLatestDailyContext(userId);
       res.json(context);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -104,9 +269,10 @@ async function startServer() {
   });
 
   // Daily Context: History (Multi-day dated records)
-  app.get('/api/context/history', (req, res) => {
+  app.get('/api/context/history', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const history = db.getDailyContextHistory();
+      const userId = req.userId!;
+      const history = db.getDailyContextHistory(userId);
       res.json(history);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -114,9 +280,10 @@ async function startServer() {
   });
 
   // Daily Context: Get single record by ID
-  app.get('/api/context/:id', (req, res) => {
+  app.get('/api/context/:id', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const record = db.getDailyContextById(req.params.id);
+      const userId = req.userId!;
+      const record = db.getDailyContextById(userId, req.params.id);
       if (!record) {
         return res.status(404).json({ error: 'Context record not found' });
       }
@@ -127,9 +294,10 @@ async function startServer() {
   });
 
   // Daily Context: Default GET (alias for latest)
-  app.get('/api/context', (req, res) => {
+  app.get('/api/context', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const context = db.getDailyContext();
+      const userId = req.userId!;
+      const context = db.getLatestDailyContext(userId);
       res.json(context);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -137,8 +305,9 @@ async function startServer() {
   });
 
   // Daily Context: Save or update context with validation
-  app.post('/api/context', (req, res) => {
+  app.post('/api/context', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
+      const userId = req.userId!;
       const validation = validateDailyContextInput(req.body);
       if (!validation.isValid) {
         return res.status(400).json({
@@ -147,11 +316,11 @@ async function startServer() {
         });
       }
 
-      const updatedContext = db.saveDailyContext(req.body);
+      const updatedContext = db.saveDailyContext(userId, req.body);
       res.json({
         success: true,
         context: updatedContext,
-        evolvingState: db.getEvolvingState(),
+        evolvingState: db.getEvolvingState(userId),
         message: 'Daily context saved and evolving state updated.'
       });
     } catch (err: any) {
@@ -160,8 +329,9 @@ async function startServer() {
   });
 
   // Daily Context: Update specific record by ID
-  app.put('/api/context/:id', (req, res) => {
+  app.put('/api/context/:id', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
+      const userId = req.userId!;
       const validation = validateDailyContextInput(req.body);
       if (!validation.isValid) {
         return res.status(400).json({
@@ -170,7 +340,7 @@ async function startServer() {
         });
       }
 
-      const updated = db.updateDailyContextById(req.params.id, req.body);
+      const updated = db.updateDailyContextById(userId, req.params.id, req.body);
       if (!updated) {
         return res.status(404).json({ error: 'Context record not found' });
       }
@@ -178,7 +348,7 @@ async function startServer() {
       res.json({
         success: true,
         context: updated,
-        evolvingState: db.getEvolvingState(),
+        evolvingState: db.getEvolvingState(userId),
         message: 'Context record updated successfully.'
       });
     } catch (err: any) {
@@ -187,9 +357,10 @@ async function startServer() {
   });
 
   // Evolving Multi-Domain User State
-  app.get('/api/state', (req, res) => {
+  app.get('/api/state', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const state = db.getEvolvingState();
+      const userId = req.userId!;
+      const state = db.getEvolvingState(userId);
       res.json(state);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -197,14 +368,15 @@ async function startServer() {
   });
 
   // Recommendation Engine: Today's personalized explainable recommendation
-  app.get('/api/recommendation/today', async (req, res) => {
+  app.get('/api/recommendation/today', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const profile = db.getUserProfile();
-      const context = db.getDailyContext();
-      const state = db.getEvolvingState();
-      const behavior = db.getBehaviorPatternSummary();
-      const goals = db.getGoals();
-      const behavioralProfile = db.getPersonalBehavioralProfile();
+      const userId = req.userId!;
+      const profile = db.getUserProfile(userId);
+      const context = db.getLatestDailyContext(userId);
+      const state = db.getEvolvingState(userId);
+      const behavior = db.getBehaviorPatternSummary(userId);
+      const goals = db.getGoals(userId);
+      const behavioralProfile = db.getPersonalBehavioralProfile(userId);
 
       const recommendation = await decisionEngine.generateTodayRecommendation(
         profile,
@@ -223,14 +395,15 @@ async function startServer() {
   });
 
   // Generate on-demand recommendation with optional custom context or weights
-  app.post('/api/recommendations/generate', async (req, res) => {
+  app.post('/api/recommendations/generate', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const profile = db.getUserProfile();
-      const context = req.body.context ? { ...db.getDailyContext(), ...req.body.context } : db.getDailyContext();
-      const state = db.getEvolvingState();
-      const behavior = db.getBehaviorPatternSummary();
-      const goals = req.body.goals || db.getGoals();
-      const behavioralProfile = db.getPersonalBehavioralProfile();
+      const userId = req.userId!;
+      const profile = db.getUserProfile(userId);
+      const context = req.body.context ? { ...db.getLatestDailyContext(userId), ...req.body.context } : db.getLatestDailyContext(userId);
+      const state = db.getEvolvingState(userId);
+      const behavior = db.getBehaviorPatternSummary(userId);
+      const goals = req.body.goals || db.getGoals(userId);
+      const behavioralProfile = db.getPersonalBehavioralProfile(userId);
       const customWeights = req.body.weights;
 
       const recommendation = await decisionEngine.generateTodayRecommendation(
@@ -251,9 +424,10 @@ async function startServer() {
   });
 
   // Recommendation Audit History
-  app.get('/api/recommendations/history', (req, res) => {
+  app.get('/api/recommendations/history', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const history = db.getRecommendationHistory();
+      const userId = req.userId!;
+      const history = db.getRecommendationHistory(userId);
       res.json(history);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -261,14 +435,15 @@ async function startServer() {
   });
 
   // Candidate Matrix Evaluation (used by Plan Lab & What-If)
-  app.post('/api/recommendations/evaluate-candidates', async (req, res) => {
+  app.post('/api/recommendations/evaluate-candidates', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const profile = db.getUserProfile();
-      const context = req.body.context ? { ...db.getDailyContext(), ...req.body.context } : db.getDailyContext();
-      const state = db.getEvolvingState();
-      const behavior = db.getBehaviorPatternSummary();
-      const goals = req.body.goals || db.getGoals();
-      const behavioralProfile = db.getPersonalBehavioralProfile();
+      const userId = req.userId!;
+      const profile = db.getUserProfile(userId);
+      const context = req.body.context ? { ...db.getLatestDailyContext(userId), ...req.body.context } : db.getLatestDailyContext(userId);
+      const state = db.getEvolvingState(userId);
+      const behavior = db.getBehaviorPatternSummary(userId);
+      const goals = req.body.goals || db.getGoals(userId);
+      const behavioralProfile = db.getPersonalBehavioralProfile(userId);
       const customWeights = req.body.weights;
 
       const candidatesToEvaluate = req.body.candidates && req.body.candidates.length > 0
@@ -301,22 +476,24 @@ async function startServer() {
   });
 
   // Recommendation Outcomes (Continuous Feedback Loop)
-  app.get('/api/outcomes', (req, res) => {
+  app.get('/api/outcomes', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const outcomes = db.getOutcomes();
+      const userId = req.userId!;
+      const outcomes = db.getOutcomes(userId);
       res.json(outcomes);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.post('/api/outcomes', (req, res) => {
+  app.post('/api/outcomes', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const newOutcome = db.addOutcome(req.body);
+      const userId = req.userId!;
+      const newOutcome = db.addOutcome(userId, req.body);
 
       // Link outcome to recommendation history
       try {
-        const history = db.getRecommendationHistory();
+        const history = db.getRecommendationHistory(userId);
         const matchingRec = history.find(h => h.recommendationId === req.body.recommendationId) || history[0];
         if (matchingRec) {
           matchingRec.outcomeStatus = newOutcome.outcomeStatus;
@@ -330,9 +507,9 @@ async function startServer() {
 
       res.status(201).json({
         outcome: newOutcome,
-        updatedState: db.getEvolvingState(),
-        behaviorSummary: db.getBehaviorPatternSummary(),
-        adaptivePlanPayload: db.getAdaptivePlanPayload()
+        updatedState: db.getEvolvingState(userId),
+        behaviorSummary: db.getBehaviorPatternSummary(userId),
+        adaptivePlanPayload: db.getAdaptivePlanPayload(userId)
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -340,36 +517,40 @@ async function startServer() {
   });
 
   // Behavior Insights & Analytical Patterns Engine
-  app.get('/api/behavior/summary', (req, res) => {
+  app.get('/api/behavior/summary', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const summary = db.getBehaviorPatternSummary();
+      const userId = req.userId!;
+      const summary = db.getBehaviorPatternSummary(userId);
       res.json(summary);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.get('/api/behavior/profile', (req, res) => {
+  app.get('/api/behavior/profile', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const profile = db.getPersonalBehavioralProfile();
+      const userId = req.userId!;
+      const profile = db.getPersonalBehavioralProfile(userId);
       res.json(profile);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.get('/api/behavior/patterns', (req, res) => {
+  app.get('/api/behavior/patterns', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const patterns = db.getBehavioralPatterns();
+      const userId = req.userId!;
+      const patterns = db.getBehavioralPatterns(userId);
       res.json(patterns);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.post('/api/behavior/recalculate', (req, res) => {
+  app.post('/api/behavior/recalculate', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const result = db.recalculateBehavioralProfile();
+      const userId = req.userId!;
+      const result = db.recalculateBehavioralProfile(userId);
       res.json({
         success: true,
         message: 'Personal behavioral profile and empirical patterns recalculated.',
@@ -380,9 +561,10 @@ async function startServer() {
     }
   });
 
-  app.get('/api/behavior/insights', (req, res) => {
+  app.get('/api/behavior/insights', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const summary = db.getBehaviorPatternSummary();
+      const userId = req.userId!;
+      const summary = db.getBehaviorPatternSummary(userId);
       res.json(summary);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -390,18 +572,20 @@ async function startServer() {
   });
 
   // Goal Strategy & Conflicts
-  app.get('/api/goals', (req, res) => {
+  app.get('/api/goals', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const goals = db.getGoals();
+      const userId = req.userId!;
+      const goals = db.getGoals(userId);
       res.json(goals);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.put('/api/goals/:id', (req, res) => {
+  app.put('/api/goals/:id', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const updated = db.updateGoal(req.params.id, req.body);
+      const userId = req.userId!;
+      const updated = db.updateGoal(userId, req.params.id, req.body);
       if (!updated) {
         return res.status(404).json({ error: 'Goal not found' });
       }
@@ -412,27 +596,30 @@ async function startServer() {
   });
 
   // Adaptive Plan & Multi-Day Dynamic Schedule
-  app.get('/api/plan/adaptive', (req, res) => {
+  app.get('/api/plan/adaptive', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const plan = db.getAdaptivePlan();
+      const userId = req.userId!;
+      const plan = db.getAdaptivePlan(userId);
       res.json(plan);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.get('/api/adaptive-plan', (req, res) => {
+  app.get('/api/adaptive-plan', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const payload = db.getAdaptivePlanPayload();
+      const userId = req.userId!;
+      const payload = db.getAdaptivePlanPayload(userId);
       res.json(payload);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
 
-  app.post('/api/adaptive-plan/rebalance', (req, res) => {
+  app.post('/api/adaptive-plan/rebalance', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const payload = db.rebalanceAdaptivePlan();
+      const userId = req.userId!;
+      const payload = db.rebalanceAdaptivePlan(userId);
       res.json({
         success: true,
         message: 'Adaptive plan successfully rebalanced based on current empirical state and outcomes.',
@@ -443,9 +630,10 @@ async function startServer() {
     }
   });
 
-  app.post('/api/adaptive-plan/reset', (req, res) => {
+  app.post('/api/adaptive-plan/reset', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const payload = db.resetAdaptivePlan();
+      const userId = req.userId!;
+      const payload = db.resetAdaptivePlan(userId);
       res.json({
         success: true,
         message: 'Plan reset to baseline research schedule template.',
@@ -456,9 +644,10 @@ async function startServer() {
     }
   });
 
-  app.get('/api/adaptive-plan/history', (req, res) => {
+  app.get('/api/adaptive-plan/history', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const history = db.getAdaptationHistory();
+      const userId = req.userId!;
+      const history = db.getAdaptationHistory(userId);
       res.json(history);
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -466,14 +655,15 @@ async function startServer() {
   });
 
   // What-If Counterfactual Lab Simulation
-  app.post('/api/what-if', async (req, res) => {
+  app.post('/api/what-if', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const context = db.getDailyContext();
-      const behavior = db.getBehaviorPatternSummary();
-      const profile = db.getUserProfile();
-      const evolvingState = db.getEvolvingState();
-      const goals = db.getGoals();
-      const behavioralProfile = db.getPersonalBehavioralProfile();
+      const userId = req.userId!;
+      const context = db.getLatestDailyContext(userId);
+      const behavior = db.getBehaviorPatternSummary(userId);
+      const profile = db.getUserProfile(userId);
+      const evolvingState = db.getEvolvingState(userId);
+      const goals = db.getGoals(userId);
+      const behavioralProfile = db.getPersonalBehavioralProfile(userId);
 
       // 1. Establish baseline & simulated context
       const baselineContext = { ...context };
@@ -931,6 +1121,32 @@ async function startServer() {
     }
   });
 
+  // GET saved What-If Scenarios
+  app.get('/api/what-if/scenarios', requireAuth, (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const scenarios = db.getWhatIfScenarios(userId);
+      res.json(scenarios);
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  // POST save What-If Scenario to persistent history
+  app.post('/api/what-if/scenarios', requireAuth, (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.userId!;
+      const saved = db.recordWhatIfScenario(userId, req.body);
+      res.status(201).json({
+        success: true,
+        scenario: saved,
+        message: 'What-If scenario saved to persistent history.'
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
   // =========================================================================
   // MACHINE LEARNING ADHERENCE PREDICTION PIPELINE
   // =========================================================================
@@ -952,10 +1168,11 @@ async function startServer() {
   });
 
   // POST predict adherence for arbitrary feature set
-  app.post('/api/ml/predict', async (req, res) => {
+  app.post('/api/ml/predict', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const context = db.getDailyContext();
-      const behavior = db.getBehaviorPatternSummary();
+      const userId = req.userId!;
+      const context = db.getLatestDailyContext(userId);
+      const behavior = db.getBehaviorPatternSummary(userId);
 
       const featureVector: AdherenceFeatureVector = {
         sleepHours: req.body.sleepHours ?? context.sleepHours,
@@ -974,15 +1191,15 @@ async function startServer() {
         baselineAdherenceRate: behavior.completionRateOverall,
         historicalSkipRate: behavior.skipRateOverall,
         historicalPartialRate: behavior.partialRateOverall,
-        behavioralMomentum: db.getEvolvingState().behavioralMomentum
+        behavioralMomentum: db.getEvolvingState(userId).behavioralMomentum
       };
 
-      const result = await mlService.predictAdherence(featureVector, req.body.userId, req.body.recommendationId);
+      const result = await mlService.predictAdherence(featureVector, userId, req.body.recommendationId);
 
       // Record to ledger if requested
       if (req.body.recordInLedger) {
         db.addPredictionRecord({
-          userId: req.body.userId || 'user-001',
+          userId,
           recommendationId: req.body.recommendationId || `cand-${Date.now()}`,
           recommendationTitle: req.body.recommendationTitle || `${featureVector.candidateDurationMinutes}-Min ${featureVector.candidateCategory}`,
           predictionProbability: result.adherenceProbability,
@@ -1005,11 +1222,12 @@ async function startServer() {
   });
 
   // GET explain adherence prediction for today's active context and recommendation
-  app.get('/api/ml/explain', async (req, res) => {
+  app.get('/api/ml/explain', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
-      const context = db.getDailyContext();
-      const behavior = db.getBehaviorPatternSummary();
-      const history = db.getRecommendationHistory();
+      const userId = req.userId!;
+      const context = db.getLatestDailyContext(userId);
+      const behavior = db.getBehaviorPatternSummary(userId);
+      const history = db.getRecommendationHistory(userId);
       const latestRec = history.length > 0 ? history[0] : null;
 
       const featureVector: Partial<AdherenceFeatureVector> = {
@@ -1029,7 +1247,7 @@ async function startServer() {
         baselineAdherenceRate: behavior.completionRateOverall,
         historicalSkipRate: behavior.skipRateOverall,
         historicalPartialRate: behavior.partialRateOverall,
-        behavioralMomentum: db.getEvolvingState().behavioralMomentum
+        behavioralMomentum: db.getEvolvingState(userId).behavioralMomentum
       };
 
       const explanation = await mlService.explainAdherence(featureVector);
@@ -1126,9 +1344,10 @@ async function startServer() {
   });
 
   // GET predictions ledger with evaluation metrics
-  app.get('/api/ml/predictions', (req, res) => {
+  app.get('/api/ml/predictions', requireAuth, (req: AuthenticatedRequest, res) => {
     try {
-      const records = db.getPredictionRecords();
+      const userId = req.userId!;
+      const records = db.getPredictionRecords(userId);
       const evaluated = records.filter(r => r.actualOutcomeStatus !== undefined);
       
       const pairs = evaluated.map(r => ({
@@ -1150,12 +1369,13 @@ async function startServer() {
   });
 
   // AI Coach Chat powered by Gemini
-  app.post('/api/coach/chat', async (req, res) => {
+  app.post('/api/coach/chat', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
+      const userId = req.userId!;
       const { message, history } = req.body;
-      const context = db.getDailyContext();
-      const state = db.getEvolvingState();
-      const behavior = db.getBehaviorPatternSummary();
+      const context = db.getLatestDailyContext(userId);
+      const state = db.getEvolvingState(userId);
+      const behavior = db.getBehaviorPatternSummary(userId);
 
       const contextSummary = `Sleep: ${context.sleepHours.toFixed(1)}h (Quality: ${context.sleepQuality}/10), Energy: ${context.energyLevel}/10, Fatigue: ${context.fatigueLevel}/10, Stress: ${context.stressLevel}/10, Recovery Readiness: ${context.recoveryScore}%, Available Time: ${context.availableMinutes}m, Environment: ${context.environment}`;
       const recommendationSummary = `Recommended Action: 20-Min Restorative Spinal Mobility & Breathwork (Low Intensity, Recovery domain) to adapt to sleep debt and fatigue.`;

@@ -11,13 +11,20 @@ import {
   Filter,
   Layers,
   Sparkles,
-  ChevronRight
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { MetricBadge } from '../common/MetricBadge.js';
+import { Accordion } from '../common/Accordion.js';
 
 export const RecommendationHistoryView: React.FC = () => {
   const { recommendationHistory, recommendation, setActiveModule } = useHealthPilot();
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Format backend history items or provide illustrative seeds if first launch
   const items = recommendationHistory.length > 0
@@ -173,146 +180,205 @@ export const RecommendationHistoryView: React.FC = () => {
     return true;
   });
 
+  const completedCount = items.filter(i => i.status.includes('Completed') && !i.status.includes('Partially')).length;
+  const partialOrSkippedCount = items.filter(i => i.status.includes('Partially') || i.status.includes('Skipped')).length;
+  const pendingCount = items.filter(i => i.status.includes('Awaiting')).length;
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-[#0F0F11] border border-slate-800 rounded-2xl p-6 shadow-xs space-y-2">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/20">
-              <History className="w-4 h-4 inline mr-1 text-emerald-400" />
+      <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/20 flex items-center gap-1.5">
+              <History className="w-3.5 h-3.5 text-emerald-400" />
               Auditable Timeline
             </span>
             <span className="text-xs text-slate-500 font-mono">Decision Intelligence Ledger</span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <Filter className="w-3.5 h-3.5 text-slate-400" />
-            <select
-              value={filterStatus}
-              onChange={e => setFilterStatus(e.target.value)}
-              className="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 text-white focus:outline-hidden"
-            >
-              <option value="all">All Decisions ({items.length})</option>
-              <option value="completed">Completed Sessions</option>
-              <option value="partial_or_skipped">Partial / Skipped</option>
-              <option value="pending">Awaiting Execution</option>
-            </select>
-          </div>
+          <h2 className="text-lg font-bold text-white tracking-tight">
+            Recommendation Audit History
+          </h2>
+          <p className="text-xs text-slate-400 max-w-2xl leading-relaxed mt-1">
+            Full audit trail of all generated decisions, the exact physiological context when issued,
+            multi-factor score calculations, and user execution outcomes.
+          </p>
         </div>
 
-        <h2 className="text-xl font-bold text-white tracking-tight sm:text-2xl">
-          Recommendation Audit History
-        </h2>
-        <p className="text-xs sm:text-sm text-slate-400 max-w-3xl leading-relaxed">
-          Full audit trail of all generated decisions, the exact physiological context when issued,
-          multi-factor score calculations (Suitability, Adherence, Goal, Feasibility, Behavioral),
-          and execution outcomes logged by the user.
-        </p>
+        {/* Filter Selector */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Filter className="w-3.5 h-3.5 text-slate-400" />
+          <select
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value)}
+            className="bg-slate-900 border border-slate-700 text-xs rounded-lg px-3 py-1.5 text-white focus:outline-hidden"
+          >
+            <option value="all">All Decisions ({items.length})</option>
+            <option value="completed">Completed Sessions ({completedCount})</option>
+            <option value="partial_or_skipped">Partial / Skipped ({partialOrSkippedCount})</option>
+            <option value="pending">Awaiting Execution ({pendingCount})</option>
+          </select>
+        </div>
       </div>
 
-      {/* Audit Trail List */}
-      <div className="space-y-4">
-        {filteredItems.map(item => (
-          <div
-            key={item.id}
-            className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 shadow-xs space-y-3.5 hover:border-slate-700 transition-colors"
-          >
-            {/* Top Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-bold text-white">{item.title}</h3>
-                  <MetricBadge
-                    label={`${item.durationMinutes}M`}
-                    variant="slate"
-                    size="sm"
-                    icon={<Clock className="w-3 h-3" />}
-                  />
-                  <MetricBadge
-                    label={item.intensity.toUpperCase()}
-                    variant={item.intensity === 'low' ? 'emerald' : item.intensity === 'moderate' ? 'amber' : 'rose'}
-                    size="sm"
-                  />
-                  <MetricBadge label={item.environment.toUpperCase()} variant="teal" size="sm" />
-                </div>
-                <span className="text-xs text-slate-500 font-mono mt-1 block">{item.date}</span>
-              </div>
+      {/* 1. OVERVIEW STATS */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-4 space-y-1">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Total Decisions</span>
+          <span className="text-2xl font-bold font-mono text-white">{items.length}</span>
+          <p className="text-[11px] text-slate-500">Issued by Engine</p>
+        </div>
+        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-4 space-y-1">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Completed</span>
+          <span className="text-2xl font-bold font-mono text-emerald-400">{completedCount}</span>
+          <p className="text-[11px] text-slate-500">{Math.round((completedCount / (items.length || 1)) * 100)}% Execution</p>
+        </div>
+        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-4 space-y-1">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Partial / Skipped</span>
+          <span className="text-2xl font-bold font-mono text-amber-400">{partialOrSkippedCount}</span>
+          <p className="text-[11px] text-slate-500">Adapted in Microcycle</p>
+        </div>
+        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-4 space-y-1">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Awaiting</span>
+          <span className="text-2xl font-bold font-mono text-slate-300">{pendingCount}</span>
+          <p className="text-[11px] text-slate-500">Pending Feedback</p>
+        </div>
+      </div>
 
-              <div className="flex flex-wrap items-center gap-2 sm:text-right">
-                <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
-                  Score: {item.finalScore} / 100
-                </span>
-                <MetricBadge label={item.status} variant={item.statusVariant} size="sm" />
-              </div>
-            </div>
+      {/* 2. DECISION AUDIT TIMELINE */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <div className="flex items-center gap-2">
+            <History className="w-4 h-4 text-emerald-400" />
+            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+              2. Historical Decisions Ledger
+            </h3>
+          </div>
+          <span className="text-[10px] font-mono text-slate-500">
+            {filteredItems.length} Entries
+          </span>
+        </div>
 
-            {/* 5 Scoring Factors Mini Breakdown */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
-              <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Suitability</span>
-                <span className="text-sm font-mono font-bold text-teal-300">{item.suitability}%</span>
-              </div>
-              <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Adherence</span>
-                <span className="text-sm font-mono font-bold text-emerald-400">{item.predictedAdherence}%</span>
-              </div>
-              <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Goal Fit</span>
-                <span className="text-sm font-mono font-bold text-cyan-400">{item.goalAlignment}%</span>
-              </div>
-              <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Feasibility</span>
-                <span className="text-sm font-mono font-bold text-indigo-400">{item.feasibility}%</span>
-              </div>
-              <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80 col-span-2 sm:col-span-1">
-                <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Behavioral Fit</span>
-                <span className="text-sm font-mono font-bold text-purple-400">{item.behavioralFit}%</span>
-              </div>
-            </div>
+        <div className="space-y-3.5">
+          {filteredItems.map(item => {
+            const isExpanded = !!expandedIds[item.id];
 
-            {/* Context & Rationale */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-              <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800 space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Context Snapshot</span>
-                <p className="text-slate-300 font-medium">{item.context}</p>
-              </div>
+            return (
+              <div
+                key={item.id}
+                className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 shadow-xs space-y-3.5 hover:border-slate-700 transition-colors"
+              >
+                {/* Top Bar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-base font-bold text-white">{item.title}</h4>
+                      <MetricBadge
+                        label={`${item.durationMinutes}M`}
+                        variant="slate"
+                        size="sm"
+                        icon={<Clock className="w-3 h-3" />}
+                      />
+                      <MetricBadge
+                        label={item.intensity.toUpperCase()}
+                        variant={item.intensity === 'low' ? 'emerald' : item.intensity === 'moderate' ? 'amber' : 'rose'}
+                        size="sm"
+                      />
+                      <MetricBadge label={item.environment.toUpperCase()} variant="teal" size="sm" />
+                    </div>
+                    <span className="text-xs text-slate-500 font-mono mt-1 block">{item.date}</span>
+                  </div>
 
-              <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800 space-y-1">
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Decision Logic & Synthesis</span>
-                <p className="text-slate-300 text-[11px] leading-relaxed">{item.rationale}</p>
-              </div>
-            </div>
-
-            {/* Key Factors */}
-            {item.keyFactors.length > 0 && (
-              <div className="pt-2 border-t border-slate-800/80">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                  Contributing Decision Factors:
-                </span>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  {item.keyFactors.map((kf, ki) => (
-                    <span key={ki} className="px-2 py-1 rounded bg-slate-800/50 text-slate-300 text-[11px] border border-white/5">
-                      • {kf}
+                  <div className="flex flex-wrap items-center gap-2 sm:text-right">
+                    <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded border border-emerald-500/20">
+                      Score: {item.finalScore} / 100
                     </span>
-                  ))}
+                    <MetricBadge label={item.status} variant={item.statusVariant} size="sm" />
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
 
-        {filteredItems.length === 0 && (
-          <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-8 text-center space-y-2">
-            <p className="text-sm text-slate-400">No recommendation audit logs match the current filter.</p>
-            <button
-              onClick={() => setFilterStatus('all')}
-              className="text-xs font-semibold text-emerald-400 hover:text-emerald-300"
-            >
-              Clear Filter
-            </button>
-          </div>
-        )}
+                {/* 5 Scoring Factors Mini Breakdown */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs">
+                  <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Suitability</span>
+                    <span className="text-sm font-mono font-bold text-teal-300">{item.suitability}%</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Adherence</span>
+                    <span className="text-sm font-mono font-bold text-emerald-400">{item.predictedAdherence}%</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Goal Fit</span>
+                    <span className="text-sm font-mono font-bold text-cyan-400">{item.goalAlignment}%</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Feasibility</span>
+                    <span className="text-sm font-mono font-bold text-indigo-400">{item.feasibility}%</span>
+                  </div>
+                  <div className="p-2.5 bg-slate-900/60 rounded-lg border border-slate-800/80 col-span-2 sm:col-span-1">
+                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block font-semibold">Behavioral Fit</span>
+                    <span className="text-sm font-mono font-bold text-purple-400">{item.behavioralFit}%</span>
+                  </div>
+                </div>
+
+                {/* Context & Rationale */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                  <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Context Snapshot</span>
+                    <p className="text-slate-300 font-medium">{item.context}</p>
+                  </div>
+
+                  <div className="p-3 bg-slate-900/40 rounded-lg border border-slate-800 space-y-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Decision Logic & Synthesis</span>
+                    <p className="text-slate-300 text-[11px] leading-relaxed">{item.rationale}</p>
+                  </div>
+                </div>
+
+                {/* Contributing Factors (Expandable) */}
+                {item.keyFactors.length > 0 && (
+                  <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => toggleExpand(item.id)}
+                      className="text-xs text-slate-400 hover:text-emerald-400 flex items-center gap-1 font-semibold"
+                    >
+                      <span>{isExpanded ? 'Hide Contributing Factors' : `View ${item.keyFactors.length} Contributing Decision Factors`}</span>
+                      {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                )}
+
+                {isExpanded && item.keyFactors.length > 0 && (
+                  <div className="p-3 rounded-lg bg-slate-900 border border-slate-800 text-xs space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      Contributing Decision Factors:
+                    </span>
+                    <div className="space-y-1">
+                      {item.keyFactors.map((kf, ki) => (
+                        <div key={ki} className="text-slate-300 text-[11px] flex items-start gap-1.5">
+                          <span className="text-emerald-400">•</span>
+                          <span>{kf}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {filteredItems.length === 0 && (
+            <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-8 text-center space-y-2">
+              <p className="text-sm text-slate-400">No recommendation audit logs match the current filter.</p>
+              <button
+                onClick={() => setFilterStatus('all')}
+                className="text-xs font-semibold text-emerald-400 hover:text-emerald-300"
+              >
+                Clear Filter
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -688,23 +688,34 @@ export interface AdaptivePlanPayload {
 
 export interface RecommendationHistoryItem {
   id: string;
+  userId?: string;
   recommendationId?: string;
-  date: string;
+  date?: string;
   timestamp?: string;
   title: string;
+  category?: string;
   activityType?: InterventionActivityType;
   durationMinutes: number;
   intensity: 'low' | 'moderate' | 'high';
   environment: string;
   predictedAdherence: number;
-  suitability: number;
+  suitability?: number;
+  suitabilityScore?: number;
+  contextSnapshot?: Partial<DailyContext>;
+  whyRecommended?: string;
+  adaptationApplied?: string;
+  outcome?: {
+    outcomeStatus: OutcomeStatus;
+    actualDurationMinutes?: number;
+    userFeedback?: string;
+  };
   goalAlignmentScore?: number;
   behavioralFitScore?: number;
   contextFeasibilityScore?: number;
   finalDecisionScore?: number;
   status: string;
-  context: string;
-  rationale: string;
+  context?: string;
+  rationale?: string;
   explanationSummary?: string;
   goalConsidered?: string;
   conflictStatus?: string;

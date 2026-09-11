@@ -38,8 +38,10 @@ export const ContextHistoryChart: React.FC<ContextHistoryChartProps> = ({
   const [activeMetricView, setActiveMetricView] = useState<'recovery_sleep' | 'strain_energy' | 'availability'>('recovery_sleep');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
 
+  const safeHistory = Array.isArray(history) ? history : [];
+
   // Format data for recharts (chronological order from past to present)
-  const chartData = [...history]
+  const chartData = [...safeHistory]
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
     .map(record => {
       const dateObj = new Date(record.date);
@@ -47,13 +49,13 @@ export const ContextHistoryChart: React.FC<ContextHistoryChartProps> = ({
       return {
         date: record.date,
         displayDate: label,
-        recoveryScore: record.recoveryScore,
-        sleepHours: record.sleepHours,
-        energyLevel: record.energyLevel,
-        fatigueLevel: record.fatigueLevel,
-        stressLevel: record.stressLevel,
-        sorenessLevel: record.sorenessLevel,
-        availableMinutes: record.availableMinutes
+        recoveryScore: record.recoveryScore ?? 50,
+        sleepHours: record.sleepHours ?? 7,
+        energyLevel: record.energyLevel ?? 5,
+        fatigueLevel: record.fatigueLevel ?? 5,
+        stressLevel: record.stressLevel ?? 5,
+        sorenessLevel: record.sorenessLevel ?? 3,
+        availableMinutes: record.availableMinutes ?? 30
       };
     });
 
@@ -237,41 +239,47 @@ export const ContextHistoryChart: React.FC<ContextHistoryChartProps> = ({
         </div>
 
         <div className="space-y-2">
-          {history.map((record) => {
-            const isExpanded = expandedRow === record.id;
-            const recStatus = record.recoveryStatus || (record.recoveryScore >= 70 ? 'good' : record.recoveryScore < 48 ? 'low' : 'moderate');
-            const statusBadge =
-              recStatus === 'good'
-                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                : recStatus === 'low'
-                ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-                : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+          {safeHistory.length === 0 ? (
+            <div className="text-center py-6 text-slate-500 text-xs">
+              No historical context logs recorded yet.
+            </div>
+          ) : (
+            safeHistory.map((record) => {
+              const isExpanded = expandedRow === record.id;
+              const recScore = record.recoveryScore ?? 50;
+              const recStatus = record.recoveryStatus || (recScore >= 70 ? 'good' : recScore < 48 ? 'low' : 'moderate');
+              const statusBadge =
+                recStatus === 'good'
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : recStatus === 'low'
+                  ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                  : 'bg-amber-500/10 text-amber-400 border-amber-500/20';
 
-            return (
-              <div
-                key={record.id}
-                className="bg-slate-900/60 rounded-lg border border-slate-800/80 overflow-hidden transition-all text-xs"
-              >
+              return (
                 <div
-                  onClick={() => toggleRow(record.id)}
-                  className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-800/40 transition-colors"
+                  key={record.id}
+                  className="bg-slate-900/60 rounded-lg border border-slate-800/80 overflow-hidden transition-all text-xs"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="font-mono font-bold text-white text-xs flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                      <span>{record.date}</span>
-                    </div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${statusBadge}`}>
-                      {record.recoveryScore}% {recStatus}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-4 text-slate-400">
-                    <div className="hidden sm:flex items-center gap-3 text-[11px]">
-                      <span className="flex items-center gap-1">
-                        <Moon className="w-3 h-3 text-indigo-400" />
-                        <span>{record.sleepHours.toFixed(1)}h</span>
+                  <div
+                    onClick={() => toggleRow(record.id)}
+                    className="p-3 flex items-center justify-between cursor-pointer hover:bg-slate-800/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="font-mono font-bold text-white text-xs flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{record.date}</span>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${statusBadge}`}>
+                        {recScore}% {recStatus}
                       </span>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-slate-400">
+                      <div className="hidden sm:flex items-center gap-3 text-[11px]">
+                        <span className="flex items-center gap-1">
+                          <Moon className="w-3 h-3 text-indigo-400" />
+                          <span>{Number(record.sleepHours ?? 7).toFixed(1)}h</span>
+                        </span>
                       <span className="flex items-center gap-1">
                         <Zap className="w-3 h-3 text-amber-400" />
                         <span>{record.energyLevel}/10</span>
@@ -352,7 +360,7 @@ export const ContextHistoryChart: React.FC<ContextHistoryChartProps> = ({
                 )}
               </div>
             );
-          })}
+          }))}
         </div>
       </div>
     </div>
