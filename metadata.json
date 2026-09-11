@@ -1,0 +1,6 @@
+{
+  "name": "HealthPilot AI",
+  "description": "Personalized Health and Fitness Decision Intelligence System with multi-domain state modeling, behavioral pattern analysis, explainable recommendations, continuous feedback loops, and adaptive schedule planning.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

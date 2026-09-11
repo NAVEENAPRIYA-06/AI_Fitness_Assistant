@@ -1,0 +1,148 @@
+{
+  "model_name": "Logistic Regression",
+  "model_version": "1.0.0-prototype",
+  "training_dataset_size": 13,
+  "data_source": "Demonstration model trained on seed data",
+  "training_timestamp": "2026-09-07T08:53:51.812724",
+  "feature_list": [
+    "sleep_hours",
+    "sleep_quality",
+    "energy_level",
+    "fatigue_level",
+    "stress_level",
+    "soreness_level",
+    "available_minutes",
+    "recommended_duration_minutes",
+    "time_margin_minutes",
+    "energy_fatigue_ratio",
+    "historical_completion_rate",
+    "historical_skip_rate",
+    "historical_partial_rate",
+    "behavioral_momentum",
+    "goal_priority_numeric",
+    "environment",
+    "activity_type",
+    "intensity",
+    "recommended_time",
+    "day_of_week",
+    "preferred_environment",
+    "preferred_time"
+  ],
+  "selected_model_metrics": {
+    "sample_count": 13,
+    "accuracy": 0.8462,
+    "precision": 0.8571,
+    "recall": 0.8571,
+    "f1_score": 0.8571,
+    "roc_auc": 0.8571,
+    "brier_score": 0.1391,
+    "confusion_matrix": [
+      [
+        5,
+        1
+      ],
+      [
+        1,
+        6
+      ]
+    ],
+    "class_distribution": {
+      "positive_completed": 7,
+      "negative_skipped": 6
+    },
+    "limitation_notice": "Model performance is based on limited historical data and should be interpreted as a prototype evaluation.",
+    "model_name": "Logistic Regression"
+  },
+  "class_distribution": {
+    "completed_positive": 7,
+    "skipped_negative": 6
+  },
+  "model_comparison": [
+    {
+      "model_name": "Logistic Regression",
+      "metrics": {
+        "sample_count": 13,
+        "accuracy": 0.8462,
+        "precision": 0.8571,
+        "recall": 0.8571,
+        "f1_score": 0.8571,
+        "roc_auc": 0.8571,
+        "brier_score": 0.1391,
+        "confusion_matrix": [
+          [
+            5,
+            1
+          ],
+          [
+            1,
+            6
+          ]
+        ],
+        "class_distribution": {
+          "positive_completed": 7,
+          "negative_skipped": 6
+        },
+        "limitation_notice": "Model performance is based on limited historical data and should be interpreted as a prototype evaluation.",
+        "model_name": "Logistic Regression"
+      }
+    },
+    {
+      "model_name": "Random Forest",
+      "metrics": {
+        "sample_count": 13,
+        "accuracy": 0.8462,
+        "precision": 0.8571,
+        "recall": 0.8571,
+        "f1_score": 0.8571,
+        "roc_auc": 0.8571,
+        "brier_score": 0.1405,
+        "confusion_matrix": [
+          [
+            5,
+            1
+          ],
+          [
+            1,
+            6
+          ]
+        ],
+        "class_distribution": {
+          "positive_completed": 7,
+          "negative_skipped": 6
+        },
+        "limitation_notice": "Model performance is based on limited historical data and should be interpreted as a prototype evaluation.",
+        "model_name": "Random Forest"
+      }
+    },
+    {
+      "model_name": "Gradient Boosting",
+      "metrics": {
+        "sample_count": 13,
+        "accuracy": 0.8462,
+        "precision": 0.8571,
+        "recall": 0.8571,
+        "f1_score": 0.8571,
+        "roc_auc": 0.7381,
+        "brier_score": 0.1606,
+        "confusion_matrix": [
+          [
+            5,
+            1
+          ],
+          [
+            1,
+            6
+          ]
+        ],
+        "class_distribution": {
+          "positive_completed": 7,
+          "negative_skipped": 6
+        },
+        "limitation_notice": "Model performance is based on limited historical data and should be interpreted as a prototype evaluation.",
+        "model_name": "Gradient Boosting"
+      }
+    }
+  ],
+  "selection_rationale": "Selected Logistic Regression with lowest Brier Score (0.1391) and balanced probabilistic calibration across 13 records.",
+  "limitation_notice": "Model performance is based on limited historical data and should be interpreted as a prototype evaluation."
+}
