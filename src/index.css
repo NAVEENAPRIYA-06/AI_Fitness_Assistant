@@ -1,29 +1,245 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   HEALTHPILOT AI — THEME DEFINITIONS
+   
+   Active Theme: "Coral Wellness"
+   Legacy / Fallback: "Fresh Wellness" (Preserved at the bottom of this file)
+   ========================================================================== */
+
+:root {
+  /* LIGHT THEME (Coral Wellness Light) */
+  --background: #FFF9F7;
+  --surface: #FFFFFF;
+  --surface-elevated: #FFFFFF;
+  --surface-soft: #FFF1EC; /* Peach subtle background */
+  --surface-card: #FFFFFF;
+
+  /* Primary Brand Coral */
+  --primary: #F26B5E;
+  --primary-hover: #E85A4F;
+  --primary-soft: #FDE8E5; /* Soft coral */
+  --primary-glow: rgba(242, 107, 94, 0.20);
+
+  /* Peach Accents */
+  --peach: #FFF1EC;
+  --peach-soft: #FFF7F4;
+
+  /* Semantic Status Colors (Distinct from Brand Coral) */
+  --success: #10B981;
+  --success-hover: #059669;
+  --success-soft: rgba(16, 185, 129, 0.12);
+
+  --secondary: #0284C7;
+  --secondary-soft: rgba(2, 132, 199, 0.12);
+
+  --warning: #D97706;
+  --warning-soft: rgba(217, 119, 6, 0.12);
+
+  --danger: #EF4444;
+  --danger-soft: rgba(239, 68, 68, 0.12);
+
+  /* Text Hierarchy */
+  --text-primary: #1F2933;
+  --text-secondary: #667085;
+  --text-muted: #8E98A8;
+
+  /* Borders & Shadows */
+  --border: #E7D8D4;
+  --border-subtle: rgba(231, 216, 212, 0.6);
+  --shadow-sm: 0 1px 3px 0 rgba(31, 41, 51, 0.04), 0 1px 2px -1px rgba(31, 41, 51, 0.04);
+  --shadow-md: 0 4px 16px -2px rgba(31, 41, 51, 0.06), 0 2px 6px -2px rgba(31, 41, 51, 0.04);
+  --shadow-lg: 0 10px 25px -4px rgba(31, 41, 51, 0.08), 0 4px 10px -4px rgba(31, 41, 51, 0.04);
+}
+
+.dark, [data-theme="dark"] {
+  /* DARK THEME (Coral Wellness Dark) */
+  --background: #171414;
+  --surface: #201B1A;
+  --surface-elevated: #282120;
+  --surface-soft: #282120; /* Secondary surface */
+  --surface-card: #201B1A;
+
+  /* Primary Brand Coral Dark */
+  --primary: #FF7A6E;
+  --primary-hover: #FF6455;
+  --primary-soft: rgba(255, 122, 110, 0.16); /* Soft coral */
+  --primary-glow: rgba(255, 122, 110, 0.25);
+
+  /* Muted Peach Accents */
+  --peach: #2E2322;
+  --peach-soft: #382A28;
+  --peach-muted: #F6C7BE;
+
+  /* Semantic Status Colors (Distinct from Brand Coral) */
+  --success: #34D399;
+  --success-hover: #10B981;
+  --success-soft: rgba(52, 211, 153, 0.15);
+
+  --secondary: #38BDF8;
+  --secondary-soft: rgba(56, 189, 248, 0.12);
+
+  --warning: #F59E0B;
+  --warning-soft: rgba(245, 158, 11, 0.15);
+
+  --danger: #F87171;
+  --danger-soft: rgba(248, 113, 113, 0.15);
+
+  /* Text Hierarchy */
+  --text-primary: #F9F5F3;
+  --text-secondary: #B8AAA6;
+  --text-muted: #847773;
+
+  /* Borders & Shadows */
+  --border: #403330;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 6px 20px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 12px 30px -4px rgba(0, 0, 0, 0.65);
+}
+
 @layer base {
+  * {
+    border-color: var(--border);
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background-color: #0A0A0B;
-    color: #e2e8f0;
+    background-color: var(--background);
+    color: var(--text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
-  
-  code, pre, .font-mono {
-    font-family: 'JetBrains Mono', monospace;
+
+  /* Accessible headings */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
 }
 
-/* Custom subtle dark scrollbar */
+/* Wellness Utilities */
+.wellness-card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s ease;
+}
+
+.wellness-card-elevated {
+  background-color: var(--surface-elevated);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-md);
+  transition: all 0.2s ease;
+}
+
+.wellness-card-soft {
+  background-color: var(--surface-soft);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.875rem;
+}
+
+.wellness-hero-gradient {
+  background: linear-gradient(135deg, var(--surface) 0%, var(--surface-soft) 100%);
+  border: 1px solid var(--border);
+}
+
+.wellness-badge-primary {
+  background-color: var(--primary-soft);
+  color: var(--primary);
+  border: 1px solid rgba(242, 107, 94, 0.25);
+}
+
+.wellness-badge-success {
+  background-color: var(--success-soft);
+  color: var(--success);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+}
+
+.wellness-badge-warning {
+  background-color: var(--warning-soft);
+  color: var(--warning);
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}
+
+.wellness-badge-danger {
+  background-color: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.wellness-badge-secondary {
+  background-color: var(--secondary-soft);
+  color: var(--secondary);
+  border: 1px solid rgba(2, 132, 199, 0.25);
+}
+
+/* Custom subtle scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0A0A0B;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #27272a;
+  background: var(--text-muted);
+  opacity: 0.3;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3f3f46;
+  background: var(--text-secondary);
 }
+
+/* ==========================================================================
+   FALLBACK / REVERT PALETTE: "FRESH WELLNESS" (PREVIOUS GREEN THEME)
+   To revert to Fresh Wellness, copy the variables below into :root and .dark:
+
+   --- LIGHT FRESH WELLNESS ---
+   --background: #F5F8F7;
+   --surface: #FFFFFF;
+   --surface-elevated: #FFFFFF;
+   --surface-soft: #EDF3F1;
+   --surface-card: #FFFFFF;
+   --primary: #159A6A;
+   --primary-hover: #118359;
+   --primary-soft: rgba(21, 154, 106, 0.12);
+   --primary-glow: rgba(21, 154, 106, 0.20);
+   --secondary: #3B82F6;
+   --secondary-soft: rgba(59, 130, 246, 0.12);
+   --warning: #C98A18;
+   --warning-soft: rgba(201, 138, 24, 0.12);
+   --danger: #DC5A5A;
+   --danger-soft: rgba(220, 90, 90, 0.12);
+   --text-primary: #17201D;
+   --text-secondary: #53615C;
+   --text-muted: #7A8782;
+   --border: #E0E8E5;
+   --border-subtle: rgba(0, 0, 0, 0.06);
+
+   --- DARK FRESH WELLNESS ---
+   --background: #0D1110;
+   --surface: #121918;
+   --surface-elevated: #17201E;
+   --surface-soft: #1B2523;
+   --surface-card: #141C1A;
+   --primary: #35D399;
+   --primary-hover: #2CCB91;
+   --primary-soft: rgba(53, 211, 153, 0.12);
+   --primary-glow: rgba(53, 211, 153, 0.22);
+   --secondary: #60A5FA;
+   --secondary-soft: rgba(96, 165, 250, 0.12);
+   --warning: #F5B84B;
+   --warning-soft: rgba(245, 184, 75, 0.12);
+   --danger: #F87171;
+   --danger-soft: rgba(248, 113, 113, 0.12);
+   --text-primary: #F4F7F6;
+   --text-secondary: #B7C2BE;
+   --text-muted: #7F8B87;
+   --border: #222E2B;
+   --border-subtle: rgba(255, 255, 255, 0.08);
+   ========================================================================== */

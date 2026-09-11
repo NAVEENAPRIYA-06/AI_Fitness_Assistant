@@ -1,191 +1,178 @@
-import React, { useState } from 'react';
-import { Menu, RefreshCw, Sparkles, Sliders, ShieldCheck, UserCheck, LogOut, ChevronDown, UserPlus } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Menu,
+  Sparkles,
+  Sliders,
+  LogOut,
+  ChevronDown,
+  Sun,
+  Moon,
+  Activity,
+  User
+} from 'lucide-react';
 import { useHealthPilot } from '../../context/HealthPilotContext.js';
+import { useTheme } from '../../context/ThemeContext.js';
+import { QuickSearch } from './QuickSearch.js';
 
 interface HeaderProps {
   setMobileOpen: (open: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ setMobileOpen }) => {
-  const { activeModule, setActiveModule, profile, refreshAll, isLoading, currentUser, logout } = useHealthPilot();
+  const { setActiveModule, profile, currentUser, logout } = useHealthPilot();
+  const { theme, toggleTheme } = useTheme();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
-  const moduleTitles: Record<string, { title: string; subtitle: string }> = {
-    today: {
-      title: 'Today’s Decision Intelligence',
-      subtitle: 'What should you focus on today based on physiological readiness & behavioral patterns?'
-    },
-    context: {
-      title: 'My Daily Context',
-      subtitle: 'Record changing sleep, fatigue, stress, soreness, time, and environment conditions.'
-    },
-    coach: {
-      title: 'AI Health Coach',
-      subtitle: 'Conversational health intelligence grounded in your evolving state and model explanations.'
-    },
-    what_if: {
-      title: 'What-If & Counterfactual Lab',
-      subtitle: 'Simulate condition changes and observe model-based adherence shifts with SHAP attributions.'
-    },
-    plan_lab: {
-      title: 'Plan Lab',
-      subtitle: 'Compare candidate interventions, trade-offs, and multi-objective suitability scores.'
-    },
-    conflicts: {
-      title: 'Goal-Condition Conflict Detector',
-      subtitle: 'Identifies acute recovery mismatches against long-term athletic goals and resolves them.'
-    },
-    insights: {
-      title: 'Behavioral Pattern Analysis',
-      subtitle: 'Empirical analysis of workout duration, environment, completion rates, and failure barriers.'
-    },
-    journal: {
-      title: 'Outcome Journal',
-      subtitle: 'Log actual decisions and barriers to close the continuous feedback loop.'
-    },
-    history: {
-      title: 'Recommendation History',
-      subtitle: 'Auditable timeline of issued decisions, context snapshots, and real outcomes.'
-    },
-    progress: {
-      title: 'Progress & Trends',
-      subtitle: 'Recovery readiness, adherence trajectories, and physiological volume over time.'
-    },
-    adaptive_plan: {
-      title: 'Adaptive Weekly Plan',
-      subtitle: 'Dynamic training schedule that automatically shifts sessions based on completed and skipped actions.'
-    },
-    goals: {
-      title: 'Goal Strategy',
-      subtitle: 'Active goals, milestones, and strategic adjustments.'
-    },
-    settings: {
-      title: 'System Settings & Profile',
-      subtitle: 'Manage physiological metrics, hardware equipment, and modular ML connections.'
-    }
-  };
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
-  const currentMeta = moduleTitles[activeModule] || {
-    title: 'HealthPilot AI',
-    subtitle: 'Decision Intelligence System'
-  };
+  const userName = currentUser?.name || profile?.name || 'User';
+  const userInitial = userName.charAt(0).toUpperCase();
 
   return (
-    <header className="sticky top-0 z-30 bg-[#0A0A0B]/90 backdrop-blur-md border-b border-slate-800 px-4 sm:px-6 py-3.5 flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="lg:hidden p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white"
-          aria-label="Open sidebar"
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-base sm:text-lg font-bold text-white tracking-tight">
-              {currentMeta.title}
-            </h1>
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded">
-              <ShieldCheck className="w-3 h-3 text-emerald-400" />
-              Verified Engine
-            </span>
-          </div>
-          <p className="hidden md:block text-xs text-slate-400 mt-0.5 tracking-tight line-clamp-1">
-            {currentMeta.subtitle}
-          </p>
-        </div>
-      </div>
-
-      {/* Action Buttons & Profile */}
-      <div className="flex items-center gap-2 sm:gap-3">
-        {/* Quick Context Switch */}
-        <button
-          onClick={() => setActiveModule('context')}
-          className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-300 bg-slate-800/80 hover:bg-slate-700 border border-slate-700 transition-colors"
-        >
-          <Sliders className="w-3.5 h-3.5 text-slate-400" />
-          <span>Update Context</span>
-        </button>
-
-        {/* Quick Coach Ask */}
-        <button
-          onClick={() => setActiveModule('coach')}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#0A0A0B] bg-emerald-500 hover:bg-emerald-400 transition-colors shadow-xs"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Ask Coach</span>
-        </button>
-
-        {/* Refresh Data */}
-        <button
-          onClick={refreshAll}
-          disabled={isLoading}
-          title="Refresh Decision State"
-          className="p-1.5 sm:p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-emerald-400' : ''}`} />
-        </button>
-
-        {/* Authenticated User Menu */}
-        <div className="relative">
+    <header className="sticky top-0 z-30 bg-[var(--surface)]/95 backdrop-blur-md border-b border-[var(--border)] px-3 sm:px-6 py-2.5 sm:py-3 transition-colors duration-200">
+      <div className="flex items-center justify-between gap-2 sm:gap-4 max-w-7xl mx-auto">
+        {/* 1. HealthPilot Branding */}
+        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 shrink-0">
           <button
-            onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-2 pl-2 sm:pl-3 pr-2.5 py-1 bg-slate-900 border border-slate-800 rounded-full hover:bg-slate-800 hover:border-slate-700 transition-all"
+            onClick={() => setMobileOpen(true)}
+            className="lg:hidden p-1.5 sm:p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)] transition-colors"
+            aria-label="Open sidebar"
           >
-            <div className="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold text-xs flex items-center justify-center">
-              {(currentUser?.name || profile?.name || 'U').charAt(0).toUpperCase()}
-            </div>
-            <div className="hidden md:flex flex-col items-start leading-none text-left">
-              <span className="text-xs font-semibold text-slate-200">
-                {currentUser?.name || profile?.name || 'Account'}
-              </span>
-              <span className="text-[9px] text-emerald-400 font-mono">
-                Active Account
-              </span>
-            </div>
-            <ChevronDown className="w-3.5 h-3.5 text-slate-400 ml-0.5" />
+            <Menu className="w-5 h-5" />
           </button>
 
-          {dropdownOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-[#121215] border border-slate-800 rounded-xl shadow-2xl p-2 z-50 animate-fade-in">
-              <div className="px-3 py-2 border-b border-slate-800/80 mb-1">
-                <p className="text-xs font-semibold text-white truncate">
-                  {currentUser?.name || profile?.name || 'User'}
-                </p>
-                <p className="text-[10px] text-slate-400 truncate">
-                  {currentUser?.email || ''}
-                </p>
-                <div className="mt-1.5 inline-flex items-center gap-1 text-[10px] text-emerald-400 font-mono bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
-                  <UserCheck className="w-3 h-3" />
-                  <span>Personal Data Isolated</span>
-                </div>
+          <div
+            onClick={() => setActiveModule('today')}
+            className="flex items-center gap-2 sm:gap-2.5 cursor-pointer group"
+          >
+            <div className="w-8 h-8 sm:w-8.5 sm:h-8.5 rounded-xl bg-[var(--primary)] flex items-center justify-center text-white shadow-xs transition-transform group-hover:scale-105 shrink-0">
+              <Activity className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-white" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="text-sm sm:text-base font-extrabold text-[var(--text-primary)] tracking-tight">
+                  HealthPilot
+                </span>
+                <span className="text-[var(--primary)] font-extrabold text-xs">AI</span>
               </div>
+              <p className="hidden md:block text-[11px] text-[var(--text-muted)] font-medium tracking-tight truncate">
+                Your Personal Fitness Coach
+              </p>
+            </div>
+          </div>
+        </div>
 
-              <button
-                onClick={() => {
-                  setDropdownOpen(false);
-                  setActiveModule('settings');
-                }}
-                className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-slate-300 hover:text-white hover:bg-slate-800/80 transition-colors text-left"
-              >
-                <span>Profile & Hardware Settings</span>
-              </button>
+        {/* 2. Quick Search: Center */}
+        <div className="flex-1 max-w-xs sm:max-w-md mx-1 sm:mx-4">
+          <QuickSearch />
+        </div>
 
-              <div className="border-t border-slate-800/80 mt-1 pt-1">
+        {/* 3. Actions & Profile: Right Side */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Theme Switcher Toggle (Light <-> Dark) */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            className="p-2 sm:p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)] transition-colors border border-[var(--border)] cursor-pointer"
+          >
+            {theme === 'light' ? (
+              <Moon className="w-4 h-4 text-[var(--text-secondary)]" />
+            ) : (
+              <Sun className="w-4 h-4 text-amber-400" />
+            )}
+          </button>
+
+          {/* Check In */}
+          <button
+            type="button"
+            onClick={() => setActiveModule('context')}
+            title="Update your daily context and recovery readiness"
+            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--surface-soft)] hover:bg-[var(--surface-elevated)] border border-[var(--border)] transition-colors cursor-pointer"
+          >
+            <Sliders className="w-3.5 h-3.5 text-[var(--text-muted)]" />
+            <span>Check In</span>
+          </button>
+
+          {/* Ask Coach */}
+          <button
+            type="button"
+            onClick={() => setActiveModule('coach')}
+            title="Chat with HealthPilot Coach"
+            className="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] transition-all shadow-xs cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Ask Coach</span>
+          </button>
+
+          {/* User Profile Menu */}
+          <div ref={userMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="flex items-center gap-1.5 sm:gap-2 pl-1.5 pr-2 sm:pr-2.5 py-1 bg-[var(--surface-soft)] border border-[var(--border)] rounded-full hover:bg-[var(--surface-elevated)] transition-all cursor-pointer"
+              aria-expanded={dropdownOpen}
+              aria-label="User account menu"
+            >
+              <div className="w-6 h-6 rounded-full bg-[var(--primary-soft)] border border-[var(--primary)]/40 text-[var(--primary)] font-bold text-xs flex items-center justify-center shrink-0">
+                {userInitial}
+              </div>
+              <span className="hidden md:inline text-xs font-semibold text-[var(--text-primary)] max-w-[90px] truncate">
+                {userName}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0" />
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-[var(--surface-elevated)] border border-[var(--border)] rounded-2xl shadow-xl p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                <div className="px-3 py-2 border-b border-[var(--border)] mb-1">
+                  <p className="text-xs font-bold text-[var(--text-primary)] truncate">
+                    {userName}
+                  </p>
+                  <p className="text-[11px] text-[var(--text-muted)] truncate mt-0.5">
+                    {currentUser?.email || ''}
+                  </p>
+                </div>
+
                 <button
+                  type="button"
                   onClick={() => {
                     setDropdownOpen(false);
-                    logout();
+                    setActiveModule('settings');
                   }}
-                  className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-rose-400 hover:bg-rose-500/10 transition-colors text-left font-medium"
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-soft)] transition-colors text-left font-medium cursor-pointer"
                 >
-                  <LogOut className="w-3.5 h-3.5" />
-                  <span>Log Out</span>
+                  <User className="w-3.5 h-3.5" />
+                  <span>Settings & Preferences</span>
                 </button>
+
+                <div className="border-t border-[var(--border)] mt-1 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      logout();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs text-[var(--danger)] hover:bg-[var(--danger-soft)] transition-colors text-left font-semibold cursor-pointer"
+                  >
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>Log Out</span>
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </header>

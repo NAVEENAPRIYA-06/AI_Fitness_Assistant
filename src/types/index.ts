@@ -14,6 +14,12 @@ export interface UserProfile {
   preferredWorkoutTypes: string[];
   preferredEnvironment: 'home' | 'gym' | 'outdoor' | 'flexible';
   availableEquipment: string[];
+  primaryGoal?: string;
+  targetWeeklyWorkouts?: number;
+  targetSleepDurationHours?: number;
+  baselineRestingHeartRate?: number;
+  equipmentAccess?: string[];
+  knownContraindications?: string[];
 }
 
 export interface DailyContext {
@@ -441,6 +447,8 @@ export interface BehaviorPatternSummary {
   successfulConditions: string[];
   skipConditions: string[];
   keyObservation: string;
+  dominantBarrier?: string;
+  optimalDurationMin?: number;
   profile?: PersonalBehavioralProfile;
   patterns?: BehavioralPatternsData;
 }
@@ -635,7 +643,7 @@ export interface AdaptivePlanDay {
   dayName?: string; // alias for display
   date: string;
   title: string;
-  plannedSession?: string; // alias for display
+  plannedSession?: any; // alias for display or object
   category: 'workout' | 'lighter_activity' | 'recovery' | 'active_rest';
   durationMinutes: number;
   intensity: 'low' | 'moderate' | 'high';
@@ -646,8 +654,16 @@ export interface AdaptivePlanDay {
   originalDurationMinutes?: number;
   originalIntensity?: 'low' | 'moderate' | 'high';
   originalCategory?: 'workout' | 'lighter_activity' | 'recovery' | 'active_rest';
+  originalSession?: {
+    title?: string;
+    plannedSession?: string;
+    durationMinutes?: number;
+    intensity?: 'low' | 'moderate' | 'high';
+    category?: string;
+  };
   triggeringEvidence?: string;
   evidenceThresholdMet?: boolean;
+  goalPreserved?: string;
   goalPreservedTitle?: string;
   adaptationTimestamp?: string;
 }
@@ -657,18 +673,28 @@ export interface PlanAdaptationEvent {
   timestamp: string;
   dayId: string;
   dayOfWeek: string;
+  dayName?: string;
   date: string;
-  triggerType: 'fatigue_recovery' | 'time_compression' | 'repeated_skip' | 'environment_friction' | 'adherence_rebound' | 'manual_rebalance';
+  triggerType: 'fatigue_recovery' | 'time_compression' | 'repeated_skip' | 'environment_friction' | 'adherence_rebound' | 'manual_rebalance' | string;
   triggeringEvidence: string;
+  ruleApplied?: string;
+  previousSession?: {
+    title?: string;
+    plannedSession?: string;
+    durationMinutes?: number;
+    intensity?: 'low' | 'moderate' | 'high';
+  };
   originalSession: {
-    title: string;
-    durationMinutes: number;
-    intensity: 'low' | 'moderate' | 'high';
+    title?: string;
+    plannedSession?: string;
+    durationMinutes?: number;
+    intensity?: 'low' | 'moderate' | 'high';
   };
   adaptedSession: {
-    title: string;
-    durationMinutes: number;
-    intensity: 'low' | 'moderate' | 'high';
+    title?: string;
+    plannedSession?: string;
+    durationMinutes?: number;
+    intensity?: 'low' | 'moderate' | 'high';
   };
   goalPreserved: string;
   status: 'active' | 'superseded';
@@ -676,13 +702,14 @@ export interface PlanAdaptationEvent {
 
 export interface AdaptivePlanPayload {
   days: AdaptivePlanDay[];
-  baselineDays: AdaptivePlanDay[];
+  baselineDays?: AdaptivePlanDay[];
   adaptationEvents: PlanAdaptationEvent[];
-  lastRebalancedAt: string;
-  momentumStatus: 'Strong' | 'Moderate' | 'Low';
-  momentumScore: number;
+  lastRebalancedAt?: string;
+  lastRebalanced?: string;
+  momentumStatus?: 'Strong' | 'Moderate' | 'Low';
+  momentumScore?: number;
   activeAdaptationsCount: number;
-  dataSufficiency: 'insufficient' | 'preliminary' | 'moderate' | 'high';
+  dataSufficiency?: 'insufficient' | 'preliminary' | 'moderate' | 'high';
   dataSufficiencyNotice?: string;
 }
 
@@ -690,6 +717,8 @@ export interface RecommendationHistoryItem {
   id: string;
   userId?: string;
   recommendationId?: string;
+  recommendationSnapshot?: any;
+  outcomeLogged?: boolean;
   date?: string;
   timestamp?: string;
   title: string;

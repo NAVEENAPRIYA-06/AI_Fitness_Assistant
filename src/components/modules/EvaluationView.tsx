@@ -162,15 +162,15 @@ export const EvaluationView: React.FC = () => {
           </button>
           <button
             onClick={handleExportJson}
-            className="px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors inline-flex items-center gap-2"
+            className="px-3.5 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg border border-slate-700 transition-colors inline-flex items-center gap-2 cursor-pointer"
             title="Download full evaluation metrics in JSON"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-400" />
+            <Download className="w-3.5 h-3.5 text-[var(--primary)]" />
             Export JSON
           </button>
           <button
             onClick={handleExportCsv}
-            className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-black font-semibold text-xs rounded-lg transition-colors inline-flex items-center gap-2 shadow-xs"
+            className="px-3.5 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-semibold text-xs rounded-lg transition-colors inline-flex items-center gap-2 shadow-xs cursor-pointer"
             title="Download multi-section CSV report"
           >
             <Download className="w-3.5 h-3.5" />
@@ -254,9 +254,9 @@ export const EvaluationView: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`px-4 py-3 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 ${
+              className={`px-4 py-3 text-xs sm:text-sm font-medium border-b-2 whitespace-nowrap transition-colors flex items-center gap-2 cursor-pointer ${
                 isActive
-                  ? 'border-emerald-500 text-emerald-400 bg-emerald-500/5'
+                  ? 'border-[var(--primary)] text-[var(--primary)] bg-[var(--primary-soft)]'
                   : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
               }`}
             >

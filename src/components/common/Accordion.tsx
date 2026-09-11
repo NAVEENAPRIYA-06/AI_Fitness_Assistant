@@ -102,7 +102,7 @@ const SingleAccordionItem: React.FC<SingleAccordionItemProps> = ({
         aria-expanded={isOpen}
         aria-controls={contentId}
         onClick={handleToggle}
-        className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors cursor-pointer select-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-500/50 ${headerClassName}`}
+        className={`w-full flex items-center justify-between gap-3 px-4 py-3.5 text-left transition-colors cursor-pointer select-none focus:outline-hidden focus-visible:ring-2 focus-visible:ring-[var(--primary)]/50 ${headerClassName}`}
       >
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {icon && (

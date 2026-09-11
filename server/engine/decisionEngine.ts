@@ -17,6 +17,7 @@ import {
 } from '../../src/types/index.js';
 import { mlService, AdherenceFeatureVector } from '../ml/mlService.js';
 import { db } from '../db/repository.js';
+import { formatDateKey } from '../../src/utils/dateUtils.js';
 
 /**
  * Standard Intervention Catalog
@@ -52,24 +53,52 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     targetDomain: 'Postural Reset & Micro-Recovery',
     category: 'recovery'
   },
+  {
+    id: 'cand-mobility-neck-15',
+    activityType: 'Mobility & Stretching',
+    title: '15-Min Desk Worker Neck, Shoulder & Upper Back Reset',
+    durationMinutes: 15,
+    intensity: 'low',
+    environment: 'home',
+    requiredEquipment: [],
+    goalAlignment: 'Upper Body Tension Release & Postural Alignment',
+    recoveryDemand: 'low',
+    description: 'Gentle cervical retraction, doorframe pec stretches, wall angels, and prone Y-T-W raises to unlock upper back stiffness.',
+    targetDomain: 'Postural Restoration & Zero-Equipment Mobility',
+    category: 'recovery'
+  },
+  {
+    id: 'cand-mobility-25',
+    activityType: 'Mobility & Stretching',
+    title: '25-Min Full-Body Joint Health & Mobility Flow',
+    durationMinutes: 25,
+    intensity: 'low',
+    environment: 'home',
+    requiredEquipment: ['Yoga mat'],
+    goalAlignment: 'Long-Term Joint Longevity & Range of Motion',
+    recoveryDemand: 'low',
+    description: 'Deep ankle dorsiflexion, deep goblet squat holds, world greatest stretch, and spinal segmentation to maintain resilient joints.',
+    targetDomain: 'Connective Tissue Resilience & Flexibility',
+    category: 'recovery'
+  },
 
   // 2. Functional Strength
   {
-    id: 'cand-strength-25',
+    id: 'cand-strength-bodyweight-20',
     activityType: 'Functional Strength',
-    title: '25-Min Home Dumbbell Strength (Posterior Focus)',
-    durationMinutes: 25,
+    title: '20-Min Zero-Equipment Full-Body Calisthenics',
+    durationMinutes: 20,
     intensity: 'moderate',
     environment: 'home',
-    requiredEquipment: ['Adjustable dumbbells', 'Resistance bands'],
-    goalAlignment: 'Posterior Chain Strength & Core Stability',
+    requiredEquipment: [],
+    goalAlignment: 'Functional Hypertrophy & Habit Consistency',
     recoveryDemand: 'moderate',
-    description: 'Controlled tempo Romanian deadlifts, single-arm dumbbell rows, half-kneeling presses, and pallof presses.',
-    targetDomain: 'Posterior Chain Hypertrophy & Neuromuscular Tone',
+    description: 'Tempo bodyweight squats, push-up variations, reverse lunges, glute bridges, and hollow body holds in clean interval circuits.',
+    targetDomain: 'Foundational Neuromuscular Strength & Core Control',
     category: 'workout'
   },
   {
-    id: 'cand-strength-20',
+    id: 'cand-strength-band-20',
     activityType: 'Functional Strength',
     title: '20-Min Core & Resistance Band Stability Circuit',
     durationMinutes: 20,
@@ -78,12 +107,54 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     requiredEquipment: ['Resistance bands', 'Yoga mat'],
     goalAlignment: 'Lumbopelvic Stability & Movement Quality',
     recoveryDemand: 'low',
-    description: 'Glute bridges with band abductions, dead-bugs, bird-dogs, and side plank holds.',
+    description: 'Glute bridges with band abductions, dead-bugs, bird-dogs, and pallof presses.',
     targetDomain: 'Musculoskeletal Integrity & Postural Endurance',
     category: 'workout'
   },
   {
-    id: 'cand-strength-45',
+    id: 'cand-strength-db-posterior-25',
+    activityType: 'Functional Strength',
+    title: '25-Min Home Dumbbell Strength (Posterior Focus)',
+    durationMinutes: 25,
+    intensity: 'moderate',
+    environment: 'home',
+    requiredEquipment: ['Adjustable dumbbells'],
+    goalAlignment: 'Posterior Chain Strength & Core Stability',
+    recoveryDemand: 'moderate',
+    description: 'Controlled tempo Romanian deadlifts, single-arm dumbbell rows, half-kneeling presses, and farmer walks.',
+    targetDomain: 'Posterior Chain Hypertrophy & Neuromuscular Tone',
+    category: 'workout'
+  },
+  {
+    id: 'cand-strength-db-upper-30',
+    activityType: 'Functional Strength',
+    title: '30-Min Upper-Body Dumbbell Push & Pull Complex',
+    durationMinutes: 30,
+    intensity: 'moderate',
+    environment: 'home',
+    requiredEquipment: ['Adjustable dumbbells'],
+    goalAlignment: 'Upper Body Muscular Endurance & Hypertrophy',
+    recoveryDemand: 'moderate',
+    description: 'Floor press, bent-over rows, overhead seated press, hammer curls, and lateral raises supersetted for time efficiency.',
+    targetDomain: 'Upper Body Structural Balance & Muscular Density',
+    category: 'workout'
+  },
+  {
+    id: 'cand-strength-db-lower-30',
+    activityType: 'Functional Strength',
+    title: '30-Min Lower-Body Dumbbell Squat & Hinge Circuit',
+    durationMinutes: 30,
+    intensity: 'moderate',
+    environment: 'home',
+    requiredEquipment: ['Adjustable dumbbells'],
+    goalAlignment: 'Lower Body Strength & Glute Development',
+    recoveryDemand: 'moderate',
+    description: 'Goblet squats, Bulgarian split squats, dumbbell RDLs, and calf raises focused on controlled eccentric tempo.',
+    targetDomain: 'Lower Limb Strength & Hip Extension Power',
+    category: 'workout'
+  },
+  {
+    id: 'cand-strength-gym-45',
     activityType: 'Functional Strength',
     title: '45-Min Progressive Overload Heavy Compound Hypertrophy',
     durationMinutes: 45,
@@ -92,14 +163,42 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     requiredEquipment: ['Barbell & Rack', 'Dumbbells', 'Cable machine'],
     goalAlignment: 'Maximal Strength & 2x Bodyweight Deadlift',
     recoveryDemand: 'high',
-    description: 'Heavy barbell deadlifts, barbell rows, dumbbell bench presses, and heavy farmer carries.',
+    description: 'Heavy barbell deadlifts or squats, barbell rows, dumbbell bench presses, and heavy farmer carries.',
     targetDomain: 'Maximal Neuromuscular Recruitment & Structural Remodeling',
     category: 'workout'
   },
-
-  // 3. Aerobic Cardio
   {
-    id: 'cand-cardio-35',
+    id: 'cand-strength-gym-35',
+    activityType: 'Functional Strength',
+    title: '35-Min Gym Functional Dumbbell & Cable Complex',
+    durationMinutes: 35,
+    intensity: 'moderate',
+    environment: 'gym',
+    requiredEquipment: ['Dumbbells', 'Cable machine'],
+    goalAlignment: 'Athletic Conditioning & Hypertrophy',
+    recoveryDemand: 'moderate',
+    description: 'Cable face-pulls, dumbbell lunges, cable chest flyes, lat pulldowns, and woodchoppers for total-body athletic tone.',
+    targetDomain: 'Hypertrophy & Multi-Planar Functional Strength',
+    category: 'workout'
+  },
+  {
+    id: 'cand-strength-core-15',
+    activityType: 'Functional Strength',
+    title: '15-Min Foundation Core & Pelvic Stability Sequence',
+    durationMinutes: 15,
+    intensity: 'low',
+    environment: 'home',
+    requiredEquipment: ['Yoga mat'],
+    goalAlignment: 'Trunk Stability & Injury Prevention',
+    recoveryDemand: 'low',
+    description: 'Deadbugs, bird dogs, side planks, hollow body holds, and glute bridge marches focusing on deep pelvic floor and transverse abdominis activation.',
+    targetDomain: 'Core Stability & Low-Barrier Habit Execution',
+    category: 'workout'
+  },
+
+  // 3. Aerobic Cardio & Running
+  {
+    id: 'cand-cardio-zone2-35',
     activityType: 'Aerobic Cardio',
     title: '35-Min Aerobic Zone 2 Baseline Run',
     durationMinutes: 35,
@@ -113,21 +212,21 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     category: 'workout'
   },
   {
-    id: 'cand-cardio-20',
+    id: 'cand-cardio-jog-20',
     activityType: 'Aerobic Cardio',
     title: '20-Min Low-Stress Aerobic Jog & Strides',
     durationMinutes: 20,
     intensity: 'low',
     environment: 'outdoor',
     requiredEquipment: ['Running shoes'],
-    goalAlignment: 'Cardiovascular Aerobic Maintenance',
+    goalAlignment: 'Cardiovascular Aerobic Maintenance & Consistency',
     recoveryDemand: 'low',
     description: 'Gentle conversational jog with 4 easy 15-second rhythm strides at the conclusion.',
     targetDomain: 'Active Hemodynamic Flow & Running Economy',
     category: 'workout'
   },
   {
-    id: 'cand-cardio-45',
+    id: 'cand-cardio-intervals-45',
     activityType: 'Aerobic Cardio',
     title: '45-Min Outdoor Threshold Intervals (4 x 4 min)',
     durationMinutes: 45,
@@ -140,10 +239,38 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     targetDomain: 'VO2 Max Threshold & Glycolytic Tolerance',
     category: 'workout'
   },
+  {
+    id: 'cand-cardio-cycle-25',
+    activityType: 'Aerobic Cardio',
+    title: '25-Min Low-Impact Indoor Cycling / Spin',
+    durationMinutes: 25,
+    intensity: 'moderate',
+    environment: 'home',
+    requiredEquipment: ['Stationary bike'],
+    goalAlignment: 'Joint-Friendly Aerobic Conditioning',
+    recoveryDemand: 'moderate',
+    description: 'Steady cadence intervals at 85-95 RPM with progressive resistance to build aerobic stamina without joint impact.',
+    targetDomain: 'Non-Impact Cardiovascular Endurance',
+    category: 'workout'
+  },
 
   // 4. Walking
   {
     id: 'cand-walk-20',
+    activityType: 'Walking',
+    title: '20-Min Brisk Neighborhood Cadence Walk',
+    durationMinutes: 20,
+    intensity: 'low',
+    environment: 'outdoor',
+    requiredEquipment: [],
+    goalAlignment: 'Daily Step Target & Consistent Habit Building',
+    recoveryDemand: 'low',
+    description: 'Upbeat cadence walk outdoors to stimulate blood circulation and clear daily mental fog.',
+    targetDomain: 'Baseline Metabolic Flux & Mental Refreshment',
+    category: 'lighter_activity'
+  },
+  {
+    id: 'cand-walk-sunlight-20',
     activityType: 'Walking',
     title: '20-Min Parasympathetic Outdoor Sunlight Walk',
     durationMinutes: 20,
@@ -157,7 +284,7 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     category: 'lighter_activity'
   },
   {
-    id: 'cand-walk-30',
+    id: 'cand-walk-incline-30',
     activityType: 'Walking',
     title: '30-Min Brisk Incline Aerobic Walk',
     durationMinutes: 30,
@@ -171,37 +298,7 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     category: 'lighter_activity'
   },
 
-  // 5. HIIT
-  {
-    id: 'cand-hiit-15',
-    activityType: 'HIIT',
-    title: '15-Min Micro-Interval High-Density Tabata',
-    durationMinutes: 15,
-    intensity: 'high',
-    environment: 'home',
-    requiredEquipment: ['Yoga mat'],
-    goalAlignment: 'Metabolic Conditioning & Time-Compressed Consistency',
-    recoveryDemand: 'high',
-    description: '4 rounds of 20s all-out bodyweight movement (air squats, mountain climbers, burpees) followed by 10s rest.',
-    targetDomain: 'Anaerobic Alactic Stimulation & Caloric Flux',
-    category: 'workout'
-  },
-  {
-    id: 'cand-hiit-25',
-    activityType: 'HIIT',
-    title: '25-Min Kettlebell / Dumbbell High-Density Intervals',
-    durationMinutes: 25,
-    intensity: 'high',
-    environment: 'home',
-    requiredEquipment: ['Adjustable dumbbells'],
-    goalAlignment: 'Cardiovascular Work Capacity & Functional Power',
-    recoveryDemand: 'high',
-    description: 'EMOM (Every Minute on the Minute) circuit alternating dumbbell clean & thrusters, push-up burpees, and kettlebell swings.',
-    targetDomain: 'EPOC Caloric Afterburn & Dynamic Power Endurance',
-    category: 'workout'
-  },
-
-  // 6. Yoga
+  // 5. Yoga
   {
     id: 'cand-yoga-20',
     activityType: 'Yoga',
@@ -231,7 +328,7 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     category: 'recovery'
   },
 
-  // 7. Active Recovery
+  // 6. Active Recovery & Breathwork
   {
     id: 'cand-recovery-25',
     activityType: 'Active Recovery',
@@ -246,12 +343,10 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     targetDomain: 'Blood Flow Acceleration without Neuroendocrine Stress',
     category: 'recovery'
   },
-
-  // 8. Recovery / Rest
   {
     id: 'cand-rest-15',
     activityType: 'Recovery / Rest',
-    title: '15-Min Autonomic Nervous System Breathwork & Yoga Nidra',
+    title: '15-Min Autonomic Nervous System Breathwork & Deep Reset',
     durationMinutes: 15,
     intensity: 'low',
     environment: 'home',
@@ -261,6 +356,36 @@ export const INTERVENTION_CATALOG: CandidateIntervention[] = [
     description: 'Guided resonant 4-7-8 diaphragmatic breathing followed by structured body-scan relaxation to reset autonomic balance.',
     targetDomain: 'Parasympathetic Activation & Deep Nervous System Reset',
     category: 'recovery'
+  },
+
+  // 7. HIIT & High-Density Intervals
+  {
+    id: 'cand-hiit-tabata-15',
+    activityType: 'HIIT',
+    title: '15-Min Micro-Interval High-Density Tabata',
+    durationMinutes: 15,
+    intensity: 'high',
+    environment: 'home',
+    requiredEquipment: ['Yoga mat'],
+    goalAlignment: 'Metabolic Conditioning & Time-Compressed Consistency',
+    recoveryDemand: 'high',
+    description: '4 rounds of 20s all-out bodyweight movement (air squats, mountain climbers, burpees) followed by 10s rest.',
+    targetDomain: 'Anaerobic Alactic Stimulation & Caloric Flux',
+    category: 'workout'
+  },
+  {
+    id: 'cand-hiit-kb-25',
+    activityType: 'HIIT',
+    title: '25-Min Kettlebell / Dumbbell High-Density Intervals',
+    durationMinutes: 25,
+    intensity: 'high',
+    environment: 'home',
+    requiredEquipment: ['Adjustable dumbbells'],
+    goalAlignment: 'Cardiovascular Work Capacity & Functional Power',
+    recoveryDemand: 'high',
+    description: 'EMOM (Every Minute on the Minute) circuit alternating dumbbell clean & thrusters, push-up burpees, and kettlebell swings.',
+    targetDomain: 'EPOC Caloric Afterburn & Dynamic Power Endurance',
+    category: 'workout'
   }
 ];
 
@@ -278,66 +403,161 @@ export class DecisionIntelligenceEngine {
 
   /**
    * Step 3: Candidate Generation
-   * Generates a realistic, context-appropriate pool of candidate interventions.
+   * Generates a realistic, context-appropriate pool of candidate interventions tailored to:
+   * 1. Available time window
+   * 2. Available equipment
+   * 3. Current environment (home, gym, outdoor)
+   * 4. User fitness level (beginner, intermediate, advanced)
+   * 5. User primary goal
+   * 6. Anti-repetition check against recent recommendations/outcomes
    */
   public generateCandidates(
     context: DailyContext,
     profile: UserProfile,
     state: EvolvingUserState,
     goals: GoalStrategyItem[],
-    behavioralProfile?: PersonalBehavioralProfile
+    behavioralProfile?: PersonalBehavioralProfile,
+    recentHistory?: RecommendationHistoryItem[]
   ): CandidateIntervention[] {
     const availableTime = context.availableMinutes || 30;
     const currentEnvironment = context.environment || 'home';
-    const userEquipment = context.equipmentAvailable || profile.availableEquipment || ['Yoga mat'];
+    const rawEquipment = context.equipmentAvailable || profile.availableEquipment || ['Yoga mat'];
+    const userEquipment = rawEquipment.map(e => e.toLowerCase());
+    const fitnessLevel = (profile.fitnessLevel || 'intermediate').toLowerCase();
 
-    // Select candidates matching time window or adaptive variants
-    const pool = INTERVENTION_CATALOG.filter(candidate => {
-      // If user has restricted time (< 25 min), avoid long sessions (> 35 min) in primary pool
-      if (availableTime < 25 && candidate.durationMinutes > 35) {
-        return false;
+    // Helper: does the user have equipment for this candidate?
+    const hasEquipmentFor = (cand: CandidateIntervention): boolean => {
+      if (cand.requiredEquipment.length === 0) return true;
+      return cand.requiredEquipment.every(req => {
+        const reqLower = req.toLowerCase();
+        if (reqLower === 'yoga mat') return true; // mats are ubiquitous or easily substituted
+        return userEquipment.some(eq => eq.includes(reqLower) || reqLower.includes(eq));
+      });
+    };
+
+    // Helper: is environment compatible?
+    const isEnvironmentCompatible = (cand: CandidateIntervention): boolean => {
+      if (cand.environment === 'any') return true;
+      if (currentEnvironment === 'home') {
+        // At home: home is ideal; outdoor is accessible; gym is excluded!
+        return cand.environment === 'home' || cand.environment === 'outdoor';
       }
+      if (currentEnvironment === 'gym') {
+        return true; // Everything is accessible at or from gym
+      }
+      if (currentEnvironment === 'outdoor') {
+        return cand.environment === 'outdoor' || cand.requiredEquipment.length === 0;
+      }
+      return true;
+    };
+
+    // Helper: is fitness level compatible?
+    const isFitnessLevelCompatible = (cand: CandidateIntervention): boolean => {
+      if (fitnessLevel === 'beginner') {
+        // Beginners should not be prescribed high-intensity threshold or maximal deadlifts
+        if (cand.intensity === 'high') return false;
+        if (cand.durationMinutes > 35) return false;
+      }
+      return true;
+    };
+
+    // Primary goal category
+    const primaryGoal = goals.find(g => g.priority === 'primary') || goals[0];
+    const goalCategory = primaryGoal?.category || profile.primaryGoal || 'general';
+
+    // Anti-repetition: titles of recent sessions to avoid back-to-back duplicate recommendations
+    const recentTitles = new Set(
+      (recentHistory || []).slice(0, 3).map(h => (h.title || '').toLowerCase().trim())
+    );
+
+    // Initial eligible pool matching equipment, environment, and fitness level
+    let eligiblePool = INTERVENTION_CATALOG.filter(cand => {
+      if (!hasEquipmentFor(cand)) return false;
+      if (!isEnvironmentCompatible(cand)) return false;
+      if (!isFitnessLevelCompatible(cand)) return false;
+
+      // Duration constraint: don't include sessions that exceed available time by more than 10 mins
+      if (cand.durationMinutes > availableTime + 10) return false;
+
       return true;
     });
 
-    // Ensure we include:
-    // 1. A restorative / mobility option
-    // 2. A moderate functional strength option
-    // 3. An aerobic or walking option
-    // 4. The scheduled / high-demand ambition (to show contrast and explain adaptations)
-    // 5. A time-compressed or micro option if time is scarce
+    // Fallback if strict filtering is too narrow
+    if (eligiblePool.length < 4) {
+      eligiblePool = INTERVENTION_CATALOG.filter(cand => {
+        if (cand.requiredEquipment.length > 0 && !hasEquipmentFor(cand)) return false;
+        if (cand.environment === 'gym' && currentEnvironment === 'home') return false;
+        return true;
+      });
+    }
+
     const selectedCandidates: CandidateIntervention[] = [];
 
-    // Always include Restorative Mobility
-    const mobilityOption = pool.find(c => c.activityType === 'Mobility & Stretching') || INTERVENTION_CATALOG[0];
-    selectedCandidates.push(mobilityOption);
+    // 1. Goal-aligned primary options:
+    let goalAligned = eligiblePool.filter(c => {
+      if (goalCategory === 'strength') return c.activityType === 'Functional Strength' || c.activityType === 'HIIT';
+      if (goalCategory === 'endurance') return c.activityType === 'Aerobic Cardio' || c.activityType === 'Walking';
+      if (goalCategory === 'consistency') return c.durationMinutes <= 25;
+      if (goalCategory === 'sleep' || goalCategory === 'recovery') return c.activityType === 'Mobility & Stretching' || c.activityType === 'Yoga' || c.activityType === 'Recovery / Rest';
+      return true;
+    });
 
-    // Include Moderate Strength if equipment allows, else Bodyweight/Band
-    const strengthOption = pool.find(c => c.activityType === 'Functional Strength' && c.durationMinutes <= availableTime + 10)
-      || INTERVENTION_CATALOG[2];
-    selectedCandidates.push(strengthOption);
+    // Penalize / de-duplicate recently used candidates
+    goalAligned.sort((a, b) => {
+      const aRecent = recentTitles.has(a.title.toLowerCase().trim()) ? 1 : 0;
+      const bRecent = recentTitles.has(b.title.toLowerCase().trim()) ? 1 : 0;
+      return aRecent - bRecent;
+    });
 
-    // Include Aerobic Cardio or Walking
-    const cardioOption = pool.find(c => (c.activityType === 'Aerobic Cardio' || c.activityType === 'Walking') && c.durationMinutes <= availableTime + 10)
-      || INTERVENTION_CATALOG[5];
-    selectedCandidates.push(cardioOption);
-
-    // Include High Demand / Original Ambition for transparent evaluation and conflict demonstration
-    const highOption = INTERVENTION_CATALOG.find(c => c.intensity === 'high' && c.activityType === 'Aerobic Cardio')
-      || INTERVENTION_CATALOG.find(c => c.intensity === 'high')
-      || INTERVENTION_CATALOG[7];
-    if (!selectedCandidates.some(c => c.id === highOption.id)) {
-      selectedCandidates.push(highOption);
+    if (goalAligned.length > 0) {
+      selectedCandidates.push(goalAligned[0]);
+      if (goalAligned.length > 1) {
+        selectedCandidates.push(goalAligned[1]);
+      }
     }
 
-    // Include Active Recovery or Yoga
-    const recoveryOption = pool.find(c => (c.activityType === 'Active Recovery' || c.activityType === 'Yoga' || c.activityType === 'Recovery / Rest') && !selectedCandidates.some(s => s.id === c.id));
-    if (recoveryOption) {
-      selectedCandidates.push(recoveryOption);
+    // 2. A Restorative / Mobility / Active Recovery option (vital for acute down-regulation)
+    const recoveryOptions = eligiblePool.filter(c =>
+      c.activityType === 'Mobility & Stretching' ||
+      c.activityType === 'Yoga' ||
+      c.activityType === 'Active Recovery' ||
+      c.activityType === 'Recovery / Rest'
+    );
+    recoveryOptions.sort((a, b) => {
+      const aRecent = recentTitles.has(a.title.toLowerCase().trim()) ? 1 : 0;
+      const bRecent = recentTitles.has(b.title.toLowerCase().trim()) ? 1 : 0;
+      return aRecent - bRecent;
+    });
+    const bestRecovery = recoveryOptions.find(c => !selectedCandidates.some(s => s.id === c.id));
+    if (bestRecovery) {
+      selectedCandidates.push(bestRecovery);
     }
 
-    // Ensure at least 4-5 diverse candidates
-    return selectedCandidates.slice(0, 6);
+    // 3. A Low-barrier / Time-compressed option (<= 20m)
+    const compactOption = eligiblePool.find(c =>
+      c.durationMinutes <= 20 && !selectedCandidates.some(s => s.id === c.id)
+    );
+    if (compactOption) {
+      selectedCandidates.push(compactOption);
+    }
+
+    // 4. Fill remaining spots with diverse alternatives from eligible pool
+    for (const cand of eligiblePool) {
+      if (selectedCandidates.length >= 5) break;
+      if (!selectedCandidates.some(s => s.id === cand.id)) {
+        selectedCandidates.push(cand);
+      }
+    }
+
+    // Absolute fallback: if still under 4, add from catalog
+    for (const fallback of INTERVENTION_CATALOG) {
+      if (selectedCandidates.length >= 4) break;
+      if (!selectedCandidates.some(s => s.id === fallback.id)) {
+        selectedCandidates.push(fallback);
+      }
+    }
+
+    return selectedCandidates.slice(0, 5);
   }
 
   /**
@@ -359,69 +579,58 @@ export class DecisionIntelligenceEngine {
     const reasons: string[] = [];
     let suitability = 70;
 
-    if (candidate.intensity === 'high' || candidate.recoveryDemand === 'high') {
-      // High demand requires high autonomic recovery and low fatigue
-      suitability = 50 + (recoveryScore - 50) * 0.5 + (energyLevel - 5) * 3 - (fatigueLevel - 5) * 5 - (sorenessLevel - 5) * 4;
+    // Check acute deficit condition
+    const isDeficit = recoveryScore < 55 || sleepHours < 6.0 || fatigueLevel >= 7;
+    // Check primed condition
+    const isPrimed = recoveryScore >= 70 && sleepHours >= 7.0 && fatigueLevel <= 4;
 
-      if (recoveryScore < 55) {
-        suitability -= (55 - recoveryScore) * 0.7;
-        reasons.push(`Autonomic recovery score (${recoveryScore}%) is below the safe threshold (65%) for high-intensity work.`);
-      }
-      if (sleepHours < 6.2) {
-        suitability -= 18;
-        reasons.push(`Sleep duration (${sleepHours.toFixed(1)}h) impairs glycogen replenishment and elevates soft-tissue strain risk.`);
-      }
-      if (fatigueLevel >= 6) {
-        suitability -= (fatigueLevel - 5) * 4;
-        reasons.push(`Elevated fatigue (${fatigueLevel}/10) severely impairs motor unit recruitment.`);
-      }
-      if (sorenessLevel >= 6) {
-        suitability -= (sorenessLevel - 5) * 3;
-        reasons.push(`Muscular soreness (${sorenessLevel}/10) indicates ongoing structural tissue repair.`);
-      }
-      if (stressLevel >= 7) {
-        suitability -= 10;
-        reasons.push(`Elevated allostatic stress (${stressLevel}/10) compounds cortisol accumulation during high-intensity intervals.`);
-      }
-      if (reasons.length === 0) {
-        reasons.push('High physiological readiness allows intense glycolytic stimulus.');
+    if (candidate.intensity === 'high' || candidate.recoveryDemand === 'high') {
+      if (isPrimed) {
+        suitability = 92 + (energyLevel >= 7 ? 4 : 0);
+        reasons.push('High physiological readiness allows intense, progressive training today.');
+      } else {
+        suitability = 50 + (recoveryScore - 50) * 0.5 + (energyLevel - 5) * 3 - (fatigueLevel - 5) * 5 - (sorenessLevel - 5) * 4;
+
+        if (recoveryScore < 55) {
+          suitability -= (55 - recoveryScore) * 0.8;
+          reasons.push(`Recovery score (${recoveryScore}%) is below the safe threshold for high-intensity exertion.`);
+        }
+        if (sleepHours < 6.2) {
+          suitability -= 18;
+          reasons.push(`Sleep (${sleepHours.toFixed(1)}h) elevates soft-tissue strain risk.`);
+        }
+        if (fatigueLevel >= 6) {
+          suitability -= (fatigueLevel - 5) * 4;
+          reasons.push(`Elevated fatigue (${fatigueLevel}/10) reduces motor control.`);
+        }
+        if (sorenessLevel >= 6) {
+          suitability -= (sorenessLevel - 5) * 3;
+          reasons.push(`Muscular soreness (${sorenessLevel}/10) indicates ongoing tissue repair.`);
+        }
       }
     } else if (candidate.intensity === 'moderate') {
-      // Moderate demand is well-tolerated across moderate recovery
-      suitability = 72 + (recoveryScore - 50) * 0.25 + (energyLevel - 5) * 2.5 - (fatigueLevel - 5) * 2.5 - (sorenessLevel - 5) * 2.5;
-
-      if (recoveryScore < 45) {
-        suitability -= 15;
-        reasons.push(`Low recovery score (${recoveryScore}%) requires cautious pacing and extended rest intervals.`);
-      }
-      if (fatigueLevel >= 7) {
-        suitability -= 12;
-        reasons.push(`Fatigue (${fatigueLevel}/10) suggests moderating total volume.`);
+      if (isPrimed) {
+        suitability = 94;
+        reasons.push('Excellent recovery readiness supports progressive training volume.');
+      } else if (isDeficit) {
+        suitability = 55 - (fatigueLevel - 5) * 4;
+        reasons.push(`Accumulated fatigue (${fatigueLevel}/10) suggests moderating intensity today.`);
       } else {
-        reasons.push('Moderate loading maintains functional capacity without exhausting neuroendocrine reserves.');
+        suitability = 76 + (recoveryScore - 50) * 0.25 + (energyLevel - 5) * 2 - (fatigueLevel - 5) * 2;
+        reasons.push('Moderate loading maintains steady fitness progression without overtaxing reserves.');
       }
     } else {
       // Low-intensity & Restorative interventions
-      suitability = 82;
-
-      if (recoveryScore < 60) {
-        suitability += 12; // Highly indicated when recovery is low
-        reasons.push(`Low autonomic recovery (${recoveryScore}%) directly indicates restorative parasympathetic down-regulation.`);
-      }
-      if (sleepHours < 6.5) {
-        suitability += 8;
-        reasons.push(`Preserves daily training identity without worsening sleep debt (${sleepHours.toFixed(1)}h).`);
-      }
-      if (fatigueLevel >= 6) {
-        suitability += 6;
-        reasons.push(`Active recovery accelerates lymphatic drainage and metabolic clearance under high fatigue (${fatigueLevel}/10).`);
-      }
-      if (sorenessLevel >= 5) {
-        suitability += 5;
-        reasons.push('Decompresses tight connective tissue and restores joint glide.');
-      }
-      if (reasons.length === 0) {
-        reasons.push('Restorative stimulus supports joint mobility and parasympathetic tone.');
+      if (isDeficit) {
+        suitability = 95;
+        reasons.push(`Your current recovery (${recoveryScore}%) and sleep (${sleepHours.toFixed(1)}h) indicate active recovery is the optimal choice today.`);
+      } else if (isPrimed) {
+        // When user is well-rested and primed, restorative mobility is fine as a warm-up, but progressive workouts should be prioritized!
+        suitability = 65;
+        reasons.push('Supports flexibility, though your high recovery readiness can support a progressive workout.');
+      } else {
+        suitability = 80;
+        reasons.push('Gentle restorative stimulus decompresses joints and supports habit consistency.');
       }
     }
 
@@ -438,7 +647,7 @@ export class DecisionIntelligenceEngine {
     goals: GoalStrategyItem[]
   ): { score: number; reasons: string[] } {
     if (!goals || goals.length === 0) {
-      return { score: 70, reasons: ['General fitness maintenance alignment.'] };
+      return { score: 70, reasons: ['General fitness and health alignment.'] };
     }
 
     const reasons: string[] = [];
@@ -446,46 +655,51 @@ export class DecisionIntelligenceEngine {
     let totalWeight = 0;
 
     for (const goal of goals) {
-      const weight = goal.priority === 'primary' ? 0.60 : 0.40;
+      const weight = goal.priority === 'primary' ? 0.65 : 0.35;
       totalWeight += weight;
 
       let match = 50;
 
       if (goal.category === 'endurance') {
         if (candidate.activityType === 'Aerobic Cardio') {
-          match = candidate.intensity === 'high' ? 95 : 90;
-          reasons.push(`Directly develops cardiovascular engine for "${goal.title}".`);
+          match = candidate.intensity === 'high' ? 96 : 92;
+          reasons.push(`Directly develops cardiovascular endurance for "${goal.title}".`);
         } else if (candidate.activityType === 'Walking') {
-          match = 75;
+          match = 80;
           reasons.push(`Builds low-impact aerobic base supporting "${goal.title}".`);
-        } else if (candidate.activityType === 'Mobility & Stretching') {
-          match = 70;
-          reasons.push(`Maintains pelvic and thoracic mobility crucial for running mechanics.`);
         } else if (candidate.activityType === 'Functional Strength') {
-          match = 65;
-          reasons.push(`Fortifies running durability and posterior chain power.`);
+          match = 60;
+          reasons.push(`Fortifies running durability and muscular endurance.`);
+        } else if (candidate.activityType === 'Mobility & Stretching' || candidate.activityType === 'Yoga') {
+          match = 55;
+          reasons.push(`Maintains joint mobility needed for clean running mechanics.`);
         }
       } else if (goal.category === 'strength') {
         if (candidate.activityType === 'Functional Strength') {
           match = 95;
-          reasons.push(`Directly develops posterior chain neuromuscular recruitment for "${goal.title}".`);
-        } else if (candidate.activityType === 'Mobility & Stretching') {
-          match = 75;
-          reasons.push(`Preserves joint range of motion needed for clean hip hinge mechanics.`);
+          reasons.push(`Directly builds muscular strength and power for "${goal.title}".`);
         } else if (candidate.activityType === 'HIIT') {
-          match = 70;
-          reasons.push(`Builds work capacity and dynamic explosive power.`);
+          match = 72;
+          reasons.push(`Supports dynamic work capacity and explosive power.`);
+        } else if (candidate.activityType === 'Mobility & Stretching' || candidate.activityType === 'Yoga') {
+          match = 55;
+          reasons.push(`Preserves range of motion for safe lifting mechanics.`);
+        } else {
+          match = 45;
         }
-      } else if (goal.category === 'sleep' || goal.category === 'consistency') {
+      } else if (goal.category === 'sleep' || goal.category === 'consistency' || (goal.category as string) === 'recovery') {
         if (candidate.activityType === 'Mobility & Stretching' || candidate.activityType === 'Recovery / Rest' || candidate.activityType === 'Yoga') {
           match = 95;
-          reasons.push(`Lowers sympathetic arousal to directly support "${goal.title}".`);
+          reasons.push(`Promotes nervous system recovery to directly support "${goal.title}".`);
         } else if (candidate.activityType === 'Walking' || candidate.activityType === 'Active Recovery') {
           match = 85;
-          reasons.push(`Regulates diurnal cortisol curve to protect sleep quality.`);
+          reasons.push(`Helps regulate stress levels and supports sleep quality.`);
+        } else if (candidate.durationMinutes <= 20) {
+          match = 90;
+          reasons.push(`Time-accessible format preserves streak consistency.`);
         } else if (candidate.intensity === 'high') {
-          match = 25;
-          reasons.push(`High sympathetic arousal may temporarily conflict with "${goal.title}".`);
+          match = 30;
+          reasons.push(`High intensity may temporarily conflict with "${goal.title}".`);
         }
       }
 
@@ -498,7 +712,6 @@ export class DecisionIntelligenceEngine {
 
   /**
    * Step 6: Personal Behavioral Fit Assessment (0 - 100)
-   * Integrates user's empirical behavioral profile, preferred durations, environment completion rates, and barrier mitigation.
    */
   public evaluateBehavioralFit(
     candidate: CandidateIntervention,
@@ -507,11 +720,11 @@ export class DecisionIntelligenceEngine {
   ): { score: number; reasons: string[]; isAttenuated: boolean } {
     const reasons: string[] = [];
 
-    // Data Sufficiency check: if fewer than 3 outcomes or insufficient data, apply neutral score and flag attenuation
+    // Data Sufficiency check: if fewer than 3 outcomes or insufficient data, apply neutral score
     if (!profile || profile.observationCount < 3 || profile.dataSufficiency === 'insufficient') {
       return {
-        score: 50,
-        reasons: ['Behavioral history is accumulating (baseline learning phase); neutral behavioral score applied.'],
+        score: 60,
+        reasons: ['Learning your personal habits; neutral habit score applied.'],
         isAttenuated: true
       };
     }
@@ -520,35 +733,35 @@ export class DecisionIntelligenceEngine {
 
     // 1. Duration range comparison
     if (candidate.durationMinutes <= 30) {
-      fit += 18;
-      reasons.push(`Duration (${candidate.durationMinutes}m) fits your highest historical completion bucket (16–30m @ ${summary?.completionRateHome || 83}%).`);
+      fit += 16;
+      reasons.push(`Fits your highest completion duration bracket (under 30 minutes).`);
     } else if (candidate.durationMinutes > 40) {
-      fit -= 22;
-      reasons.push(`Duration (${candidate.durationMinutes}m) enters your lowest historical completion tier (>40m).`);
+      fit -= 20;
+      reasons.push(`Sessions over 40 minutes historically see lower completion.`);
     }
 
     // 2. Environment completion rate comparison
     if (candidate.environment === 'home') {
-      fit += 12;
-      reasons.push(`Home environment matches your highest historical completion rate (${summary?.completionRateHome || 83}%).`);
+      fit += 10;
+      reasons.push(`Home workouts match your strongest routine consistency.`);
     } else if (candidate.environment === 'gym') {
-      fit -= 18;
-      reasons.push(`Gym environment historically incurs logistical friction and lower completion (${summary?.completionRateGym || 33}%).`);
+      fit -= 14;
+      reasons.push(`Gym sessions historically have higher schedule friction.`);
     }
 
     // 3. Dominant failure barrier mitigation
     if (profile.dominantBarrier.toLowerCase().includes('tired') || profile.dominantBarrier.toLowerCase().includes('fatigue')) {
       if (candidate.intensity === 'low' || candidate.recoveryDemand === 'low') {
         fit += 12;
-        reasons.push(`Low-barrier session prevents triggering your dominant failure mode ("${profile.dominantBarrier}").`);
+        reasons.push(`Lower-intensity session prevents triggering your fatigue barrier.`);
       } else if (candidate.intensity === 'high') {
         fit -= 16;
-        reasons.push(`High intensity directly triggers your dominant historical skip barrier ("${profile.dominantBarrier}").`);
+        reasons.push(`High intensity risks triggering your usual fatigue skip pattern.`);
       }
     } else if (profile.dominantBarrier.toLowerCase().includes('time')) {
       if (candidate.durationMinutes <= 20) {
-        fit += 15;
-        reasons.push(`Compact duration neutralizes your dominant historical barrier ("${profile.dominantBarrier}").`);
+        fit += 14;
+        reasons.push(`Compact duration avoids schedule time pressure.`);
       }
     }
 
@@ -567,7 +780,8 @@ export class DecisionIntelligenceEngine {
     const reasons: string[] = [];
     const availableTime = context.availableMinutes || 30;
     const currentEnvironment = context.environment || 'home';
-    const equipmentAvailable = context.equipmentAvailable || ['Yoga mat'];
+    const rawEquipment = context.equipmentAvailable || ['Yoga mat'];
+    const equipmentAvailable = rawEquipment.map(e => e.toLowerCase());
 
     // 1. Time feasibility
     let timeScore = 100;
@@ -577,40 +791,44 @@ export class DecisionIntelligenceEngine {
       reasons.push(`Fits comfortably in your ${availableTime}-minute available window (+${margin}m buffer).`);
     } else {
       const deficit = candidate.durationMinutes - availableTime;
-      timeScore = Math.max(10, 100 - deficit * 6);
+      timeScore = Math.max(5, 100 - deficit * 8);
       reasons.push(`Exceeds today's available time (${availableTime}m) by ${deficit} minutes.`);
     }
 
     // 2. Equipment feasibility
     let equipScore = 100;
     const missingEquip = candidate.requiredEquipment.filter(
-      req => !equipmentAvailable.some(avail => avail.toLowerCase().includes(req.toLowerCase()) || req.toLowerCase().includes(avail.toLowerCase()))
+      req => {
+        const reqLower = req.toLowerCase();
+        if (reqLower === 'yoga mat') return false; // readily available/substitutable
+        return !equipmentAvailable.some(avail => avail.includes(reqLower) || reqLower.includes(avail));
+      }
     );
 
     if (missingEquip.length > 0) {
-      equipScore = 25;
-      reasons.push(`Missing required equipment: ${missingEquip.join(', ')}.`);
+      equipScore = 5; // cannot execute without required equipment!
+      reasons.push(`Requires equipment you don't have listed: ${missingEquip.join(', ')}.`);
     } else if (candidate.requiredEquipment.length > 0) {
-      reasons.push(`All equipment available (${candidate.requiredEquipment.join(', ')}).`);
+      reasons.push(`All needed equipment is ready.`);
     } else {
-      reasons.push('Zero equipment required.');
+      reasons.push('No equipment needed.');
     }
 
     // 3. Environment feasibility
     let envScore = 100;
     if (candidate.environment !== 'any' && candidate.environment !== currentEnvironment) {
       if (candidate.environment === 'gym' && currentEnvironment === 'home') {
-        envScore = 20;
-        reasons.push('Requires traveling to gym while current location is home.');
+        envScore = 10;
+        reasons.push('Requires traveling to a gym while you are currently at home.');
       } else if (candidate.environment === 'outdoor' && currentEnvironment === 'home') {
-        envScore = 75; // stepping outside is minor friction
+        envScore = 80;
         reasons.push('Requires stepping outdoors from home.');
       }
     }
 
     // Weighted context feasibility
     const finalScore = Math.max(5, Math.min(99, Math.round(
-      0.50 * timeScore + 0.30 * equipScore + 0.20 * envScore
+      0.50 * timeScore + 0.35 * equipScore + 0.15 * envScore
     )));
 
     return { score: finalScore, reasons: reasons.slice(0, 3) };
@@ -618,12 +836,6 @@ export class DecisionIntelligenceEngine {
 
   /**
    * Step 8: Multi-Factor Decision Scoring
-   * Final Decision Score =
-   *   Suitability contribution +
-   *   Goal alignment contribution +
-   *   Behavioral fit contribution +
-   *   Predicted adherence contribution +
-   *   Context feasibility contribution
    */
   public calculateDecisionScore(
     scores: {
@@ -683,18 +895,18 @@ export class DecisionIntelligenceEngine {
     const isRecoveryLow = recoveryScore < 55;
 
     const primaryGoal = goals.find(g => g.priority === 'primary') || {
-      title: '10K Endurance Base & High-Intensity Threshold Training',
-      category: 'endurance'
+      title: 'Fitness & Health Progression',
+      category: 'general'
     };
 
     if ((isSleepDepleted || isFatigued) && isRecoveryLow) {
       return {
         hasConflict: true,
         goalName: primaryGoal.title,
-        conditionDescription: `Acute sleep deficit (${sleepHours.toFixed(1)}h) and elevated fatigue (${fatigueLevel}/10) have lowered recovery readiness to ${recoveryScore}%.`,
+        conditionDescription: `Lower sleep (${sleepHours.toFixed(1)}h) and fatigue (${fatigueLevel}/10) brought recovery to ${recoveryScore}%.`,
         severity: 'high',
-        conflictExplanation: `Your scheduled training plan calls for high-intensity work towards "${primaryGoal.title}", but attempting high-demand glycolytic exertion during an acute physiological deficit delays recovery, elevates injury risk, and statistically triples session abandonment.`,
-        recommendedResolution: 'Prioritize low-demand restorative mobility or active recovery today. Shift high-intensity threshold stimulus to 48 hours later once sleep and autonomic markers rebound.'
+        conflictExplanation: `Your scheduled workout plan aimed for higher intensity toward "${primaryGoal.title}", but training hard with low recovery increases injury risk and fatigue accumulation.`,
+        recommendedResolution: 'Switch to a restorative or low-intensity session today. Resume higher intensity once sleep and recovery rebound.'
       };
     }
 
@@ -704,18 +916,18 @@ export class DecisionIntelligenceEngine {
         goalName: primaryGoal.title,
         conditionDescription: `Available time window is compressed to ${availableMinutes} minutes.`,
         severity: 'moderate',
-        conflictExplanation: 'Standard 45-minute sessions cannot fit into current schedule without rushing or truncation.',
-        recommendedResolution: 'Execute a 15–20 minute high-density micro-session to preserve habit momentum without schedule friction.'
+        conflictExplanation: 'Standard sessions cannot fit into your current schedule without rushing.',
+        recommendedResolution: 'Execute a compact 15–20 minute session to maintain consistency without schedule stress.'
       };
     }
 
     return {
       hasConflict: false,
       goalName: primaryGoal.title,
-      conditionDescription: 'Context metrics within acceptable physiological tolerance bands.',
+      conditionDescription: 'Daily readiness and recovery indicators are in a healthy training range.',
       severity: 'low',
-      conflictExplanation: 'No acute dissonance between long-term goal trajectory and daily readiness.',
-      recommendedResolution: 'Execute planned session with standard pacing.'
+      conflictExplanation: 'No conflict between your long-term goals and daily readiness.',
+      recommendedResolution: 'Proceed with planned session as scheduled.'
     };
   }
 
@@ -730,24 +942,29 @@ export class DecisionIntelligenceEngine {
     weights: DecisionScoringWeights
   ): RecommendationExplanation {
     const keyFactors: string[] = [
-      `Time window match: ${selected.durationMinutes}m session fits your ${context.availableMinutes}m available window with zero logistical rush.`,
-      `Physiological suitability (${selected.suitabilityScore}%): ${selected.suitabilityReasons[0] || 'Optimized for current autonomic state.'}`,
-      `Predicted completion likelihood (${selected.predictedAdherence}%): Calibrated machine learning estimate based on current physiological and behavioral context.`,
-      `Goal alignment (${selected.goalAlignmentScore}%): ${selected.goalReasons[0] || 'Directly supports active target.'}`,
-      `Behavioral adherence fit (${selected.behavioralFitScore}%): ${selected.behavioralReasons[0] || 'Matches empirical consistency patterns.'}`
+      `Fits your ${context.availableMinutes} minutes available today with comfortable pacing buffer.`,
+      `Matches your current energy and recovery readiness level.`,
+      `Directly supports your primary fitness progress.`,
+      `${selected.predictedAdherence}% estimated completion likelihood based on your past activity patterns.`
     ];
+
+    if (selected.requiredEquipment.length === 0) {
+      keyFactors.push('Requires zero equipment, eliminating setup barriers.');
+    } else {
+      keyFactors.push(`Uses your ready home equipment (${selected.requiredEquipment.join(', ')}).`);
+    }
 
     let summary = '';
     if (goalConflict.hasConflict) {
-      summary = `Adaptive Decision Applied: System detected a goal-condition conflict (${goalConflict.conditionDescription}). Rather than forcing a high-intensity session that risks overreaching and dropout, this ${selected.durationMinutes}-minute ${selected.title} preserves daily habit momentum while accelerating nervous system restoration.`;
+      summary = `Adaptive adjustment applied: Due to ${goalConflict.conditionDescription}, this ${selected.durationMinutes}-minute ${selected.title} was chosen to maintain your routine while protecting recovery.`;
     } else {
-      summary = `Selected to maximize progression toward active goals within your ${context.availableMinutes}-minute available window, balancing high physiological suitability (${selected.suitabilityScore}%) with strong statistical adherence (${selected.predictedAdherence}%).`;
+      summary = `Recommended to advance your goals within your ${context.availableMinutes}-minute window today, pairing high readiness with strong consistency.`;
     }
 
     let comparisonVsAlternatives = '';
     if (alternatives.length > 0) {
       const runnerUp = alternatives[0];
-      comparisonVsAlternatives = `Ranked #${selected.title} ahead of #${runnerUp.title} (Score: ${selected.finalDecisionScore} vs ${runnerUp.finalDecisionScore}) due to higher physiological suitability (${selected.suitabilityScore}% vs ${runnerUp.suitabilityScore}%) and reduced logistical friction.`;
+      comparisonVsAlternatives = `Chosen ahead of "${runnerUp.title}" because it better matches today's available time, equipment, and recovery readiness.`;
     }
 
     const sContrib = Math.round(selected.suitabilityScore * weights.suitabilityWeight * 10) / 10;
@@ -759,25 +976,25 @@ export class DecisionIntelligenceEngine {
     const decisionFactors: DecisionFactorItem[] = [
       {
         factor: 'health_suitability',
-        name: 'Health Suitability',
+        name: 'Health & Readiness Suitability',
         score: selected.suitabilityScore,
         scoreDisplay: Math.round((selected.suitabilityScore / 100) * 100) / 100,
         weight: weights.suitabilityWeight,
         weightPercentage: Math.round(weights.suitabilityWeight * 100),
         contribution: sContrib,
-        reason: selected.suitabilityReasons[0] || 'Your current recovery and energy state support this session.'
+        reason: selected.suitabilityReasons[0] || 'Your current recovery and energy support this session.'
       },
       {
         factor: 'predicted_adherence',
-        name: 'Predicted Adherence',
+        name: 'Completion Likelihood',
         score: selected.predictedAdherence,
         scoreDisplay: Math.round((selected.predictedAdherence / 100) * 100) / 100,
         weight: weights.predictedAdherenceWeight,
         weightPercentage: Math.round(weights.predictedAdherenceWeight * 100),
         contribution: aContrib,
         reason: selected.predictedAdherence >= 70
-          ? 'Your previous behavior indicates strong completion likelihood under this time and energy state.'
-          : 'Elevated fatigue or limited schedule reduces predicted completion probability; session scaled conservatively.'
+          ? 'Your previous habits indicate strong completion likelihood under this time and energy state.'
+          : 'Elevated fatigue or limited schedule reduces completion likelihood; scaled conservatively.'
       },
       {
         factor: 'goal_alignment',
@@ -787,27 +1004,27 @@ export class DecisionIntelligenceEngine {
         weight: weights.goalAlignmentWeight,
         weightPercentage: Math.round(weights.goalAlignmentWeight * 100),
         contribution: gContrib,
-        reason: selected.goalReasons[0] || 'This session directly supports your primary fitness and health goals.'
+        reason: selected.goalReasons[0] || 'This session supports your primary fitness and health goals.'
       },
       {
         factor: 'context_feasibility',
-        name: 'Context Feasibility',
+        name: 'Schedule & Setup Feasibility',
         score: selected.contextFeasibilityScore,
         scoreDisplay: Math.round((selected.contextFeasibilityScore / 100) * 100) / 100,
         weight: weights.contextFeasibilityWeight,
         weightPercentage: Math.round(weights.contextFeasibilityWeight * 100),
         contribution: fContrib,
-        reason: selected.feasibilityReasons[0] || 'The session fits your available time and current environment with minimal logistical friction.'
+        reason: selected.feasibilityReasons[0] || 'The session fits your available time and current location with minimal friction.'
       },
       {
         factor: 'behavioral_fit',
-        name: 'Behavioral Fit',
+        name: 'Personal Routine Fit',
         score: selected.behavioralFitScore,
         scoreDisplay: Math.round((selected.behavioralFitScore / 100) * 100) / 100,
         weight: weights.behavioralFitWeight,
         weightPercentage: Math.round(weights.behavioralFitWeight * 100),
         contribution: bContrib,
-        reason: selected.behavioralReasons[0] || 'This activity matches your preferred activity style and historical successful execution patterns.',
+        reason: selected.behavioralReasons[0] || 'Matches your preferred session style and consistency patterns.',
         isAttenuated: weights.isBehavioralWeightAttenuated
       }
     ];
@@ -817,20 +1034,19 @@ export class DecisionIntelligenceEngine {
       keyFactors,
       suitabilityExplanation: selected.suitabilityReasons.join(' '),
       behavioralExplanation: selected.behavioralReasons.join(' '),
-      adherenceExplanation: `Machine learning adherence pipeline predicts ${selected.predictedAdherence}% completion probability under current context. Predicted adherence is a statistical estimate and not a guarantee of execution.`,
+      adherenceExplanation: `HealthPilot estimates a ${selected.predictedAdherence}% completion likelihood under your current context and schedule. Estimated completion is based on your past habits and is intended to guide sustainable pacing.`,
       conflictExplanation: goalConflict.hasConflict ? goalConflict.conflictExplanation : undefined,
       tradeoffNotice: selected.intensity === 'low'
-        ? 'Trade-off: Prioritizes autonomic recovery over acute cardiovascular threshold stimulus to protect long-term consistency.'
+        ? 'Trade-off: Prioritizes recovery over acute cardiovascular threshold stimulus to protect long-term consistency.'
         : 'Trade-off: Demands adequate hydration and post-session nutrition to support muscular repair.',
       comparisonVsAlternatives,
       decisionFactors,
-      decisionWeightsNotice: 'Current system design weights, not scientifically validated clinical weights.'
+      decisionWeightsNotice: 'Balanced across physiological readiness, schedule feasibility, and your primary goals.'
     };
   }
 
   /**
-   * Evaluates an arbitrary matrix of candidates under specified context and weights
-   * Used by Plan Lab and What-If analysis
+   * Evaluates candidate interventions against multi-factor scoring
    */
   public async evaluateCandidateMatrix(
     candidates: CandidateIntervention[],
@@ -842,7 +1058,6 @@ export class DecisionIntelligenceEngine {
     behaviorSummary?: BehaviorPatternSummary,
     customWeights?: Partial<DecisionScoringWeights>
   ): Promise<EvaluatedCandidate[]> {
-    // Check data sufficiency and adapt weights if necessary
     const isDataInsufficient = !behavioralProfile || behavioralProfile.observationCount < 3 || behavioralProfile.dataSufficiency === 'insufficient';
 
     let weights: DecisionScoringWeights = {
@@ -858,7 +1073,7 @@ export class DecisionIntelligenceEngine {
         contextFeasibilityWeight: 0.18,
         behavioralFitWeight: 0.02,
         isBehavioralWeightAttenuated: true,
-        attenuationReason: 'Behavioral history is in baseline learning phase (insufficient historical records); weight adaptively shifted to physical state.'
+        attenuationReason: 'Behavioral history is in baseline learning phase; weight shifted to physiological readiness.'
       };
     }
 
@@ -913,7 +1128,7 @@ export class DecisionIntelligenceEngine {
       evaluated.push({
         ...cand,
         suitabilityScore: suit.score,
-        healthSuitabilityScore: suit.score, // alias
+        healthSuitabilityScore: suit.score,
         goalAlignmentScore: goal.score,
         behavioralFitScore: beh.score,
         predictedAdherence: mlResult.predictedAdherence,
@@ -958,8 +1173,18 @@ export class DecisionIntelligenceEngine {
     // 1. Conflict Detection
     const goalConflict = this.detectGoalConditionConflict(profile, context, state, activeGoals);
 
+    // Retrieve recent recommendations to prevent repetition
+    const recentHistory = db.getRecommendationHistory(profile.id);
+
     // 2. Candidate Generation
-    const rawCandidates = this.generateCandidates(context, profile, state, activeGoals, activeBehaviorProfile);
+    const rawCandidates = this.generateCandidates(
+      context,
+      profile,
+      state,
+      activeGoals,
+      activeBehaviorProfile,
+      recentHistory
+    );
 
     // 3. Multi-Factor Evaluation Matrix
     const evaluatedCandidates = await this.evaluateCandidateMatrix(
@@ -973,10 +1198,13 @@ export class DecisionIntelligenceEngine {
       customWeights
     );
 
+    // 4. Winner & Alternatives Selection
     const winner = evaluatedCandidates[0];
-    const alternatives = evaluatedCandidates.slice(1, 4);
+    if (!winner) {
+      throw new Error('No candidate interventions met the evaluation criteria.');
+    }
+    const alternatives = evaluatedCandidates.slice(1);
 
-    // 4. ML Attributions for Primary Winner
     const primaryFeatureVector: AdherenceFeatureVector = {
       sleepHours: context.sleepHours ?? 7,
       sleepQuality: context.sleepQuality ?? 6,
@@ -1012,16 +1240,16 @@ export class DecisionIntelligenceEngine {
 
     // 7. Accompanying Actions
     const nutritionAction = {
-      title: context.sleepHours < 6.5 ? 'Electrolyte Hydration & Cortisol Modulation' : 'Balanced Glycogen Replenishment',
+      title: context.sleepHours < 6.5 ? 'Hydration & Balanced Recovery' : 'Balanced Energy & Protein Intake',
       description: context.sleepHours < 6.5
-        ? `Hydrate with 500ml water containing magnesium and sodium. Keep total daily hydration near 2.5L and avoid excessive late caffeine which compounds sleep fragmentation.`
-        : `Hydrate steadily (aim for ${profile.nutritionGoals[0] || '2.5L/day'}) with complex whole-food carbohydrates and lean protein post-session.`,
+        ? `Hydrate with 500ml water. Aim for steady hydration throughout the day and avoid late caffeine to support sound sleep tonight.`
+        : `Hydrate steadily (aim for ${profile.nutritionGoals[0] || '2.5L/day'}) with whole foods and lean protein post-session.`,
       timing: 'Morning to mid-afternoon'
     };
 
     const recoveryAction = {
-      title: 'Parasympathetic Down-Regulation Protocol',
-      description: 'Perform 5 minutes of 4-7-8 resonant diaphragmatic breathing post-session to down-regulate sympathetic tone and lower circulating cortisol.'
+      title: 'Down-Regulation Breathing Protocol',
+      description: 'Spend 3–5 minutes taking slow, resonant diaphragmatic breaths post-session to lower heart rate and calm your nervous system.'
     };
 
     const recId = `rec-${Date.now()}`;
@@ -1067,15 +1295,15 @@ export class DecisionIntelligenceEngine {
       isModelPlaceholder: primaryMLResult.isModelPlaceholder,
       limitationNotice: primaryMLResult.limitationNotice,
       predictionSource: primaryMLResult.modelSource === 'python_scikit_learn_service'
-        ? 'Python Scikit-Learn Microservice'
-        : 'Baseline Calibrated Heuristic'
+        ? 'HealthPilot ML Engine'
+        : 'HealthPilot Decision Engine'
     };
 
     // 8. Auto-persist snapshot to recommendation history
     try {
       const historyRecord: Omit<RecommendationHistoryItem, 'id'> = {
         recommendationId: recId,
-        date: 'Today, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: formatDateKey(new Date()),
         timestamp,
         title: winner.title,
         activityType: winner.activityType,

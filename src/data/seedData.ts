@@ -10,6 +10,7 @@ import {
   RecommendationHistoryItem,
   AdaptivePlanPayload
 } from '../types/index.js';
+import { getWeekDates, getTodayDateKey } from '../utils/dateUtils.js';
 
 export const initialProfile: UserProfile = {
   id: 'user-001',
@@ -313,12 +314,15 @@ export const initialGoals: GoalStrategyItem[] = [
   }
 ];
 
+const currentWeekDates = getWeekDates();
+const todayDateKey = getTodayDateKey();
+
 export const initialAdaptivePlan: AdaptivePlanDay[] = [
   {
     id: 'plan-day-1',
     dayOfWeek: 'Monday',
     dayName: 'Monday',
-    date: 'Today',
+    date: currentWeekDates[0].date,
     title: '20-Min Restorative Spinal Mobility & Breathwork',
     plannedSession: '20-Min Restorative Spinal Mobility & Breathwork',
     category: 'recovery',
@@ -326,86 +330,114 @@ export const initialAdaptivePlan: AdaptivePlanDay[] = [
     intensity: 'low',
     isAdaptiveAdapted: true,
     adaptationReason: 'Adapted from high-intensity intervals due to acute sleep deficit (5.8h) and high fatigue.',
-    status: 'adapted'
+    status: currentWeekDates[0].date < todayDateKey ? 'completed' : 'adapted',
+    originalTitle: '30-Min High-Intensity Threshold Intervals',
+    originalDurationMinutes: 30,
+    originalIntensity: 'high',
+    originalCategory: 'workout'
   },
   {
     id: 'plan-day-2',
     dayOfWeek: 'Tuesday',
     dayName: 'Tuesday',
-    date: 'Tomorrow',
+    date: currentWeekDates[1].date,
     title: '25-Min Home Dumbbell Strength (Posterior Focus)',
     plannedSession: '25-Min Home Dumbbell Strength (Posterior Focus)',
     category: 'workout',
     durationMinutes: 25,
     intensity: 'moderate',
     isAdaptiveAdapted: false,
-    status: 'scheduled'
+    status: currentWeekDates[1].date < todayDateKey ? 'completed' : 'scheduled',
+    originalTitle: '35-Min Home Dumbbell Strength (Posterior Focus)',
+    originalDurationMinutes: 35,
+    originalIntensity: 'moderate',
+    originalCategory: 'workout'
   },
   {
     id: 'plan-day-3',
     dayOfWeek: 'Wednesday',
     dayName: 'Wednesday',
-    date: 'In 2 days',
+    date: currentWeekDates[2].date,
     title: '35-Min Aerobic Zone 2 Base Run',
     plannedSession: '35-Min Aerobic Zone 2 Base Run',
     category: 'workout',
     durationMinutes: 35,
     intensity: 'moderate',
     isAdaptiveAdapted: false,
-    status: 'scheduled'
+    status: currentWeekDates[2].date < todayDateKey ? 'skipped' : 'scheduled',
+    originalTitle: '40-Min Aerobic Zone 2 Base Run',
+    originalDurationMinutes: 40,
+    originalIntensity: 'moderate',
+    originalCategory: 'workout'
   },
   {
     id: 'plan-day-4',
     dayOfWeek: 'Thursday',
     dayName: 'Thursday',
-    date: 'In 3 days',
-    title: 'Active Rest & Parasympathetic Walk',
-    plannedSession: 'Active Rest & Parasympathetic Walk',
+    date: currentWeekDates[3].date,
+    title: '25-Min Active Rest & Parasympathetic Walk',
+    plannedSession: '25-Min Active Rest & Parasympathetic Walk',
     category: 'active_rest',
     durationMinutes: 25,
     intensity: 'low',
     isAdaptiveAdapted: false,
-    status: 'scheduled'
+    status: currentWeekDates[3].date < todayDateKey ? 'completed' : 'scheduled',
+    originalTitle: '25-Min Active Rest & Parasympathetic Walk',
+    originalDurationMinutes: 25,
+    originalIntensity: 'low',
+    originalCategory: 'active_rest'
   },
   {
     id: 'plan-day-5',
     dayOfWeek: 'Friday',
     dayName: 'Friday',
-    date: 'In 4 days',
+    date: currentWeekDates[4].date,
     title: 'Threshold Pace Intervals (4 x 4 min)',
     plannedSession: 'Threshold Pace Intervals (4 x 4 min)',
     category: 'workout',
     durationMinutes: 35,
     intensity: 'high',
     isAdaptiveAdapted: true,
-    adaptationReason: 'Shifted from Monday to allow full recovery buffer.',
-    status: 'adapted'
+    adaptationReason: 'Shifted from Monday to allow full recovery buffer while preserving 10K threshold stimulus.',
+    status: currentWeekDates[4].date === todayDateKey ? 'scheduled' : currentWeekDates[4].date < todayDateKey ? 'completed' : 'adapted',
+    originalTitle: '30-Min Functional Kettlebell Circuit',
+    originalDurationMinutes: 30,
+    originalIntensity: 'moderate',
+    originalCategory: 'workout'
   },
   {
     id: 'plan-day-6',
     dayOfWeek: 'Saturday',
     dayName: 'Saturday',
-    date: 'In 5 days',
-    title: 'Full Body Functional Kettlebell Circuit',
-    plannedSession: 'Full Body Functional Kettlebell Circuit',
+    date: currentWeekDates[5].date,
+    title: '45-Min Aerobic Base Run / Cross-Training',
+    plannedSession: '45-Min Aerobic Base Run / Cross-Training',
     category: 'workout',
-    durationMinutes: 30,
+    durationMinutes: 45,
     intensity: 'moderate',
     isAdaptiveAdapted: false,
-    status: 'scheduled'
+    status: 'scheduled',
+    originalTitle: '45-Min Aerobic Base Run / Cross-Training',
+    originalDurationMinutes: 45,
+    originalIntensity: 'moderate',
+    originalCategory: 'workout'
   },
   {
     id: 'plan-day-7',
     dayOfWeek: 'Sunday',
     dayName: 'Sunday',
-    date: 'In 6 days',
-    title: 'Deload & Deep Tissue Recovery Flow',
-    plannedSession: 'Deload & Deep Tissue Recovery Flow',
+    date: currentWeekDates[6].date,
+    title: '30-Min Deload & Deep Tissue Recovery Flow',
+    plannedSession: '30-Min Deload & Deep Tissue Recovery Flow',
     category: 'recovery',
     durationMinutes: 30,
     intensity: 'low',
     isAdaptiveAdapted: false,
-    status: 'scheduled'
+    status: 'scheduled',
+    originalTitle: '30-Min Deload & Deep Tissue Recovery Flow',
+    originalDurationMinutes: 30,
+    originalIntensity: 'low',
+    originalCategory: 'recovery'
   }
 ];
 
@@ -500,12 +532,12 @@ export const initialAdaptivePlanPayload: AdaptivePlanPayload = {
       timestamp: new Date().toISOString(),
       dayId: 'plan-day-1',
       dayOfWeek: 'Monday',
-      date: 'Today',
+      date: currentWeekDates[0].date,
       triggerType: 'fatigue_recovery',
       triggeringEvidence: 'Sleep 5.8h < 6.0h threshold, fatigue index 7/10',
       originalSession: {
-        title: '45-Min Threshold Tempo Run',
-        durationMinutes: 45,
+        title: '30-Min High-Intensity Threshold Intervals',
+        durationMinutes: 30,
         intensity: 'high'
       },
       adaptedSession: {
@@ -514,6 +546,27 @@ export const initialAdaptivePlanPayload: AdaptivePlanPayload = {
         intensity: 'low'
       },
       goalPreserved: 'Cardiovascular 10K Base (Intervals shifted to Friday upon recovery rebound)',
+      status: 'active'
+    },
+    {
+      id: 'evt-seed-2',
+      timestamp: new Date().toISOString(),
+      dayId: 'plan-day-5',
+      dayOfWeek: 'Friday',
+      date: currentWeekDates[4].date,
+      triggerType: 'fatigue_recovery',
+      triggeringEvidence: 'Shifted Monday intervals to Friday to preserve weekly training stimulus.',
+      originalSession: {
+        title: '30-Min Functional Kettlebell Circuit',
+        durationMinutes: 30,
+        intensity: 'moderate'
+      },
+      adaptedSession: {
+        title: 'Threshold Pace Intervals (4 x 4 min)',
+        durationMinutes: 35,
+        intensity: 'high'
+      },
+      goalPreserved: 'Cardiovascular 10K Base',
       status: 'active'
     }
   ],

@@ -8,6 +8,16 @@ import {
   PersonalBehavioralProfile,
   GoalStrategyItem
 } from '../../src/types/index.js';
+import {
+  getWeekDates,
+  formatDateKey,
+  getTodayDateKey,
+  isToday,
+  isPast,
+  isFuture,
+  parseDateKey,
+  WeekDayInfo
+} from '../../src/utils/dateUtils.js';
 
 /**
  * HealthPilot AI Adaptive Plan Engine
@@ -18,134 +28,13 @@ import {
  * - Evidence-based thresholds (no over-adapting to a single isolated skip).
  * - Preserves long-term goals while adjusting immediate session volume and stimulus.
  * - Maintains auditable log of all adaptation events with transparent triggering evidence.
- * - Strictly no claims of reinforcement learning, autonomous intelligence, or medical adaptation.
+ * - Single source of truth for runtime calendar calculation (no hard-coded Wednesday or static demo dates).
+ * - Calendar-based weekly plan generation relative to the user's active calendar week.
  */
 export class AdaptivePlanEngine {
-  // PRISTINE RESEARCH BASELINE: Standard weekly training template
-  private readonly BASELINE_PLAN: AdaptivePlanDay[] = [
-    {
-      id: 'base-day-1',
-      dayOfWeek: 'Monday',
-      dayName: 'Monday',
-      date: '2026-09-07',
-      title: '30-Min High-Intensity Threshold Intervals',
-      plannedSession: '30-Min High-Intensity Threshold Intervals',
-      category: 'workout',
-      durationMinutes: 30,
-      intensity: 'high',
-      isAdaptiveAdapted: false,
-      status: 'scheduled',
-      originalTitle: '30-Min High-Intensity Threshold Intervals',
-      originalDurationMinutes: 30,
-      originalIntensity: 'high',
-      originalCategory: 'workout'
-    },
-    {
-      id: 'base-day-2',
-      dayOfWeek: 'Tuesday',
-      dayName: 'Tuesday',
-      date: '2026-09-08',
-      title: '35-Min Home Dumbbell Strength (Posterior Focus)',
-      plannedSession: '35-Min Home Dumbbell Strength (Posterior Focus)',
-      category: 'workout',
-      durationMinutes: 35,
-      intensity: 'moderate',
-      isAdaptiveAdapted: false,
-      status: 'scheduled',
-      originalTitle: '35-Min Home Dumbbell Strength (Posterior Focus)',
-      originalDurationMinutes: 35,
-      originalIntensity: 'moderate',
-      originalCategory: 'workout'
-    },
-    {
-      id: 'base-day-3',
-      dayOfWeek: 'Wednesday',
-      dayName: 'Wednesday',
-      date: '2026-09-09',
-      title: '40-Min Aerobic Zone 2 Base Run',
-      plannedSession: '40-Min Aerobic Zone 2 Base Run',
-      category: 'workout',
-      durationMinutes: 40,
-      intensity: 'moderate',
-      isAdaptiveAdapted: false,
-      status: 'scheduled',
-      originalTitle: '40-Min Aerobic Zone 2 Base Run',
-      originalDurationMinutes: 40,
-      originalIntensity: 'moderate',
-      originalCategory: 'workout'
-    },
-    {
-      id: 'base-day-4',
-      dayOfWeek: 'Thursday',
-      dayName: 'Thursday',
-      date: '2026-09-10',
-      title: '25-Min Active Rest & Parasympathetic Walk',
-      plannedSession: '25-Min Active Rest & Parasympathetic Walk',
-      category: 'active_rest',
-      durationMinutes: 25,
-      intensity: 'low',
-      isAdaptiveAdapted: false,
-      status: 'scheduled',
-      originalTitle: '25-Min Active Rest & Parasympathetic Walk',
-      originalDurationMinutes: 25,
-      originalIntensity: 'low',
-      originalCategory: 'active_rest'
-    },
-    {
-      id: 'base-day-5',
-      dayOfWeek: 'Friday',
-      dayName: 'Friday',
-      date: '2026-09-11',
-      title: '30-Min Functional Kettlebell Circuit',
-      plannedSession: '30-Min Functional Kettlebell Circuit',
-      category: 'workout',
-      durationMinutes: 30,
-      intensity: 'moderate',
-      isAdaptiveAdapted: false,
-      status: 'scheduled',
-      originalTitle: '30-Min Functional Kettlebell Circuit',
-      originalDurationMinutes: 30,
-      originalIntensity: 'moderate',
-      originalCategory: 'workout'
-    },
-    {
-      id: 'base-day-6',
-      dayOfWeek: 'Saturday',
-      dayName: 'Saturday',
-      date: '2026-09-12',
-      title: '45-Min Aerobic Base Run / Cross-Training',
-      plannedSession: '45-Min Aerobic Base Run / Cross-Training',
-      category: 'workout',
-      durationMinutes: 45,
-      intensity: 'moderate',
-      isAdaptiveAdapted: false,
-      status: 'scheduled',
-      originalTitle: '45-Min Aerobic Base Run / Cross-Training',
-      originalDurationMinutes: 45,
-      originalIntensity: 'moderate',
-      originalCategory: 'workout'
-    },
-    {
-      id: 'base-day-7',
-      dayOfWeek: 'Sunday',
-      dayName: 'Sunday',
-      date: '2026-09-13',
-      title: '30-Min Deload & Deep Tissue Recovery Flow',
-      plannedSession: '30-Min Deload & Deep Tissue Recovery Flow',
-      category: 'recovery',
-      durationMinutes: 30,
-      intensity: 'low',
-      isAdaptiveAdapted: false,
-      status: 'scheduled',
-      originalTitle: '30-Min Deload & Deep Tissue Recovery Flow',
-      originalDurationMinutes: 30,
-      originalIntensity: 'low',
-      originalCategory: 'recovery'
-    }
-  ];
-
-  // ACTIVE MUTABLE SCHEDULE STATE
+  // Mutable active plan state for default/fallback participant
   private currentPlan: AdaptivePlanDay[] = [];
+  private baselinePlan: AdaptivePlanDay[] = [];
   private adaptationEvents: PlanAdaptationEvent[] = [];
   private lastRebalancedAt: string = new Date().toISOString();
 
@@ -153,9 +42,116 @@ export class AdaptivePlanEngine {
     this.initDefaultPlan();
   }
 
-  private initDefaultPlan() {
-    // Clone baseline plan with initial Monday adaptation (seed demonstration state)
-    this.currentPlan = this.BASELINE_PLAN.map(day => ({ ...day }));
+  /**
+   * Generates a pristine baseline research training template for any calendar week.
+   * Days are strictly Monday through Sunday.
+   */
+  public generateBaselinePlan(
+    refDate: Date = new Date(),
+    profile?: UserProfile,
+    goals?: GoalStrategyItem[]
+  ): AdaptivePlanDay[] {
+    const weekDates = getWeekDates(refDate);
+    const todayKey = getTodayDateKey();
+    const isBeginner = profile?.fitnessLevel === 'beginner';
+
+    const baselineTemplates: Array<{
+      dayIndex: number;
+      title: string;
+      category: 'workout' | 'lighter_activity' | 'recovery' | 'active_rest';
+      durationMinutes: number;
+      intensity: 'low' | 'moderate' | 'high';
+    }> = [
+      {
+        dayIndex: 0, // Monday
+        title: isBeginner ? '20-Min Introductory Intervals' : '30-Min High-Intensity Threshold Intervals',
+        category: 'workout',
+        durationMinutes: isBeginner ? 20 : 30,
+        intensity: isBeginner ? 'moderate' : 'high'
+      },
+      {
+        dayIndex: 1, // Tuesday
+        title: isBeginner ? '25-Min Foundation Core & Mobility' : '35-Min Home Dumbbell Strength (Posterior Focus)',
+        category: 'workout',
+        durationMinutes: isBeginner ? 25 : 35,
+        intensity: 'moderate'
+      },
+      {
+        dayIndex: 2, // Wednesday
+        title: isBeginner ? '30-Min Easy Zone 1-2 Walk/Jog' : '40-Min Aerobic Zone 2 Base Run',
+        category: 'workout',
+        durationMinutes: isBeginner ? 30 : 40,
+        intensity: 'moderate'
+      },
+      {
+        dayIndex: 3, // Thursday
+        title: '25-Min Active Rest & Parasympathetic Walk',
+        category: 'active_rest',
+        durationMinutes: 25,
+        intensity: 'low'
+      },
+      {
+        dayIndex: 4, // Friday
+        title: isBeginner ? '25-Min Full Body Functional Flow' : '30-Min Functional Kettlebell Circuit',
+        category: 'workout',
+        durationMinutes: isBeginner ? 25 : 30,
+        intensity: 'moderate'
+      },
+      {
+        dayIndex: 5, // Saturday
+        title: isBeginner ? '35-Min Aerobic Walk & Mobility' : '45-Min Aerobic Base Run / Cross-Training',
+        category: 'workout',
+        durationMinutes: isBeginner ? 35 : 45,
+        intensity: 'moderate'
+      },
+      {
+        dayIndex: 6, // Sunday
+        title: '30-Min Deload & Deep Tissue Recovery Flow',
+        category: 'recovery',
+        durationMinutes: 30,
+        intensity: 'low'
+      }
+    ];
+
+    return baselineTemplates.map((template, idx) => {
+      const dayInfo = weekDates[template.dayIndex];
+      const dateKey = dayInfo.date;
+
+      let initialStatus: AdaptivePlanDay['status'] = 'scheduled';
+      if (dateKey < todayKey) {
+        initialStatus = 'scheduled'; // Will be converted to 'completed' or 'unlogged' when outcomes are matched
+      }
+
+      return {
+        id: `base-day-${idx + 1}`,
+        dayOfWeek: dayInfo.dayOfWeek,
+        dayName: dayInfo.dayOfWeek,
+        date: dateKey,
+        title: template.title,
+        plannedSession: template.title,
+        category: template.category,
+        durationMinutes: template.durationMinutes,
+        intensity: template.intensity,
+        isAdaptiveAdapted: false,
+        status: initialStatus,
+        originalTitle: template.title,
+        originalDurationMinutes: template.durationMinutes,
+        originalIntensity: template.intensity,
+        originalCategory: template.category
+      };
+    });
+  }
+
+  /**
+   * Initializes or refreshes default plan for current calendar week.
+   */
+  private initDefaultPlan(refDate: Date = new Date()): void {
+    const weekDates = getWeekDates(refDate);
+    this.baselinePlan = this.generateBaselinePlan(refDate);
+    this.currentPlan = this.baselinePlan.map(day => ({ ...day }));
+
+    const mondayKey = weekDates[0].date;
+    const fridayKey = weekDates[4].date;
 
     // Seed initial adaptation on Monday (acute fatigue/sleep deficit) and Friday (re-scheduled threshold work)
     this.currentPlan[0] = {
@@ -170,7 +166,7 @@ export class AdaptivePlanEngine {
       triggeringEvidence: 'Acute sleep deficit (5.8h < 6h threshold) & elevated fatigue (7/10). Recovery readiness estimated at 48%.',
       evidenceThresholdMet: true,
       goalPreservedTitle: 'Cardiovascular Aerobic Base (10K sub-50 min)',
-      adaptationTimestamp: '2026-09-07T07:15:00.000Z',
+      adaptationTimestamp: `${mondayKey}T07:15:00.000Z`,
       status: 'adapted'
     };
 
@@ -201,17 +197,17 @@ export class AdaptivePlanEngine {
       triggeringEvidence: 'Postponed Monday interval stimulus to Friday after recovery score rebounds above 70%.',
       evidenceThresholdMet: true,
       goalPreservedTitle: 'Cardiovascular Aerobic Base (10K sub-50 min)',
-      adaptationTimestamp: '2026-09-07T07:15:00.000Z',
+      adaptationTimestamp: `${mondayKey}T07:15:00.000Z`,
       status: 'adapted'
     };
 
     this.adaptationEvents = [
       {
         id: 'adapt-seed-1',
-        timestamp: '2026-09-07T07:15:00.000Z',
-        dayId: 'base-day-1',
+        timestamp: `${mondayKey}T07:15:00.000Z`,
+        dayId: this.currentPlan[0].id || 'base-day-1',
         dayOfWeek: 'Monday',
-        date: '2026-09-07',
+        date: mondayKey,
         triggerType: 'fatigue_recovery',
         triggeringEvidence: 'Acute sleep deficit (5.8h < 6h threshold) & elevated systemic fatigue (7/10). Recovery readiness estimated at 48%.',
         originalSession: {
@@ -229,10 +225,10 @@ export class AdaptivePlanEngine {
       },
       {
         id: 'adapt-seed-2',
-        timestamp: '2026-09-07T07:15:00.000Z',
-        dayId: 'base-day-5',
+        timestamp: `${mondayKey}T07:15:00.000Z`,
+        dayId: this.currentPlan[4].id || 'base-day-5',
         dayOfWeek: 'Friday',
-        date: '2026-09-11',
+        date: fridayKey,
         triggerType: 'fatigue_recovery',
         triggeringEvidence: 'Preserving weekly high-intensity stimulus by shifting Monday intervals to Friday recovery window.',
         originalSession: {
@@ -252,34 +248,198 @@ export class AdaptivePlanEngine {
   }
 
   /**
+   * Generates a completely isolated, calendar-accurate weekly plan for any user.
+   * - Ensures dates are dynamically generated for the current week.
+   * - Incorporates user profile, fitness level, equipment, preferences, and goals.
+   * - Synchronizes outcomes logged for the week (marking completed/skipped).
+   * - Avoids copying other users' plans or seeding fake history for new users.
+   */
+  public generatePlanForUser(
+    userId: string,
+    profile: UserProfile,
+    context: any,
+    state: EvolvingUserState,
+    outcomes: RecommendationOutcome[] = [],
+    goals: GoalStrategyItem[] = [],
+    behavioralProfile?: PersonalBehavioralProfile,
+    refDate: Date = new Date()
+  ): AdaptivePlanPayload {
+    const weekDates = getWeekDates(refDate);
+    const todayKey = getTodayDateKey();
+    const baseline = this.generateBaselinePlan(refDate, profile, goals);
+
+    let planDays: AdaptivePlanDay[] = baseline.map(d => ({ ...d }));
+    let events: PlanAdaptationEvent[] = [];
+
+    // If user is benchmark user-001 (Alex Vance), apply research demonstration adaptations
+    if (userId === 'user-001') {
+      const mondayKey = weekDates[0].date;
+      const fridayKey = weekDates[4].date;
+
+      planDays[0] = {
+        ...planDays[0],
+        title: '20-Min Restorative Spinal Mobility & Breathwork',
+        plannedSession: '20-Min Restorative Spinal Mobility & Breathwork',
+        category: 'recovery',
+        durationMinutes: 20,
+        intensity: 'low',
+        isAdaptiveAdapted: true,
+        adaptationReason: 'Adapted from 30m intervals due to acute sleep deficit (5.8h) and high fatigue (7/10).',
+        triggeringEvidence: 'Acute sleep deficit (5.8h < 6h threshold) & elevated fatigue (7/10). Recovery readiness 48%.',
+        evidenceThresholdMet: true,
+        goalPreservedTitle: goals[0]?.title || 'Cardiovascular Aerobic Base (10K sub-50 min)',
+        adaptationTimestamp: `${mondayKey}T07:15:00.000Z`,
+        status: 'adapted'
+      };
+
+      planDays[4] = {
+        ...planDays[4],
+        title: 'Threshold Pace Intervals (4 x 4 min)',
+        plannedSession: 'Threshold Pace Intervals (4 x 4 min)',
+        durationMinutes: 35,
+        intensity: 'high',
+        isAdaptiveAdapted: true,
+        adaptationReason: 'Shifted from Monday to allow full nervous system recovery buffer while preserving 10K threshold progress.',
+        triggeringEvidence: 'Postponed Monday interval stimulus to Friday after recovery score rebounds above 70%.',
+        evidenceThresholdMet: true,
+        goalPreservedTitle: goals[0]?.title || 'Cardiovascular Aerobic Base (10K sub-50 min)',
+        adaptationTimestamp: `${mondayKey}T07:15:00.000Z`,
+        status: 'adapted'
+      };
+
+      events.push(
+        {
+          id: `adapt-alex-1`,
+          timestamp: `${mondayKey}T07:15:00.000Z`,
+          dayId: planDays[0].id || 'base-day-1',
+          dayOfWeek: 'Monday',
+          date: mondayKey,
+          triggerType: 'fatigue_recovery',
+          triggeringEvidence: 'Acute sleep deficit (5.8h < 6h threshold) & elevated systemic fatigue (7/10). Recovery readiness estimated at 48%.',
+          originalSession: {
+            title: baseline[0].title,
+            durationMinutes: baseline[0].durationMinutes,
+            intensity: baseline[0].intensity
+          },
+          adaptedSession: {
+            title: '20-Min Restorative Spinal Mobility & Breathwork',
+            durationMinutes: 20,
+            intensity: 'low'
+          },
+          goalPreserved: 'Cardiovascular Aerobic Base (10K sub-50 min) - Volume preserved through rescheduled session',
+          status: 'active'
+        },
+        {
+          id: `adapt-alex-2`,
+          timestamp: `${mondayKey}T07:15:00.000Z`,
+          dayId: planDays[4].id || 'base-day-5',
+          dayOfWeek: 'Friday',
+          date: fridayKey,
+          triggerType: 'fatigue_recovery',
+          triggeringEvidence: 'Preserving weekly high-intensity stimulus by shifting Monday intervals to Friday recovery window.',
+          originalSession: {
+            title: baseline[4].title,
+            durationMinutes: baseline[4].durationMinutes,
+            intensity: baseline[4].intensity
+          },
+          adaptedSession: {
+            title: 'Threshold Pace Intervals (4 x 4 min)',
+            durationMinutes: 35,
+            intensity: 'high'
+          },
+          goalPreserved: 'Cardiovascular Aerobic Base (10K sub-50 min)',
+          status: 'active'
+        }
+      );
+    }
+
+    // Synchronize logged outcomes to their calendar dates
+    for (const day of planDays) {
+      const outcome = outcomes.find(o => {
+        const oDate = o.timestamp ? o.timestamp.split('T')[0] : (o as any).date;
+        return oDate === day.date;
+      });
+
+      if (outcome) {
+        if (outcome.outcomeStatus === 'completed') day.status = 'completed';
+        else if (outcome.outcomeStatus === 'skipped') day.status = 'skipped';
+        else if (outcome.outcomeStatus === 'partially_completed') day.status = 'modified';
+        if (outcome.actualDurationMinutes) {
+          day.durationMinutes = outcome.actualDurationMinutes;
+        }
+      } else if (day.date < todayKey) {
+        // Date is in the past and no outcome was recorded
+        // Keep as past unlogged (never marked upcoming or completed)
+        day.status = 'unlogged' as any;
+      }
+    }
+
+    const totalOutcomes = outcomes.length;
+    let dataSufficiency: 'insufficient' | 'preliminary' | 'moderate' | 'high' = 'insufficient';
+    let dataSufficiencyNotice = 'Gathering baseline outcomes (minimum 3 required to establish evidence-based adaptation thresholds).';
+
+    if (totalOutcomes >= 14) {
+      dataSufficiency = 'high';
+      dataSufficiencyNotice = `High statistical confidence based on ${totalOutcomes} recorded outcomes.`;
+    } else if (totalOutcomes >= 7) {
+      dataSufficiency = 'moderate';
+      dataSufficiencyNotice = `Moderate statistical confidence based on ${totalOutcomes} recorded outcomes.`;
+    } else if (totalOutcomes >= 3) {
+      dataSufficiency = 'preliminary';
+      dataSufficiencyNotice = `Preliminary evidence based on ${totalOutcomes} recorded outcomes. Adaptations require repeated barrier confirmation.`;
+    }
+
+    const momentumScore = state?.behavioralMomentum ?? 65;
+    let momentumStatus: 'Strong' | 'Moderate' | 'Low' = 'Moderate';
+    if (momentumScore >= 75) momentumStatus = 'Strong';
+    else if (momentumScore < 45) momentumStatus = 'Low';
+
+    const activeAdaptationsCount = planDays.filter(d => d.isAdaptiveAdapted).length;
+
+    return {
+      days: planDays,
+      baselineDays: baseline,
+      adaptationEvents: events,
+      lastRebalancedAt: new Date().toISOString(),
+      momentumStatus,
+      momentumScore,
+      activeAdaptationsCount,
+      dataSufficiency,
+      dataSufficiencyNotice
+    };
+  }
+
+  /**
    * Evaluates outcomes, evolving state, and behavioral profile to adapt future schedule days.
-   * STRICTLY ENFORCES EVIDENCE THRESHOLDS:
-   * 1. Insufficient data (<3 outcomes): No speculative adaptations.
-   * 2. Isolated skip: Updates adherence rate, but does NOT trigger massive schedule overhaul.
-   * 3. Repeated barrier (>=2 skips with same barrier): Triggers focused evidence-based adaptation.
-   * 4. Acute fatigue/sleep debt: Down-regulates immediate session and postpones intense stimulus.
-   * 5. Preserves primary goals across all adaptations.
+   * Strictly enforces evidence thresholds.
    */
   public evaluateAndAdaptPlan(
     state: EvolvingUserState,
     outcomes: RecommendationOutcome[],
     profile: UserProfile,
     behavioralProfile: PersonalBehavioralProfile,
-    goals: GoalStrategyItem[]
+    goals: GoalStrategyItem[],
+    planToAdapt?: AdaptivePlanDay[],
+    eventsToUse?: PlanAdaptationEvent[],
+    refDate: Date = new Date()
   ): {
     plan: AdaptivePlanDay[];
     events: PlanAdaptationEvent[];
     changesMade: boolean;
     reasons: string[];
   } {
+    let targetPlan = planToAdapt ? planToAdapt.map(d => ({ ...d })) : [...this.currentPlan];
+    let targetEvents = eventsToUse ? [...eventsToUse] : [...this.adaptationEvents];
+    const todayKey = getTodayDateKey();
+
     const changes: string[] = [];
     let modified = false;
 
     // Rule 1: Insufficient History Guardrail
     if (outcomes.length < 3) {
       return {
-        plan: [...this.currentPlan],
-        events: [...this.adaptationEvents],
+        plan: targetPlan,
+        events: targetEvents,
         changesMade: false,
         reasons: ['Baseline data collection in progress (insufficient history). Preserving standard plan.']
       };
@@ -296,7 +456,7 @@ export class AdaptivePlanEngine {
     const fatigueSkipsCount = [...recentSkips, ...recentPartials].filter(o => o.reasonForSkipOrPartial === 'too_tired').length;
     const gymSkipsCount = recentSkips.filter(o => (o.contextSnapshot?.environment || '').toLowerCase() === 'gym' || o.reasonForSkipOrPartial === 'schedule_changed').length;
 
-    // Primary Goal Reference (for goal preservation)
+    // Primary Goal Reference
     const primaryGoal = goals.find(g => g.priority === 'primary') || goals[0] || {
       title: 'Cardiovascular Aerobic Base (10K sub-50 min)'
     };
@@ -307,17 +467,17 @@ export class AdaptivePlanEngine {
       (fatigueSkipsCount >= 2);
 
     if (isFatiguedOrSleepDeprived) {
-      // Find the next scheduled high or moderate intensity day
-      const targetDayIdx = this.currentPlan.findIndex(d => 
+      // Find the next scheduled high or moderate intensity day in the future or today
+      const targetDayIdx = targetPlan.findIndex(d => 
+        (d.date >= todayKey) &&
         (d.status === 'scheduled' || d.status === 'adapted') && 
         d.intensity === 'high' && 
         d.category === 'workout'
       );
 
-      if (targetDayIdx !== -1 && targetDayIdx <= 2) {
-        const targetDay = this.currentPlan[targetDayIdx];
+      if (targetDayIdx !== -1) {
+        const targetDay = targetPlan[targetDayIdx];
         if (targetDay.category !== 'recovery') {
-          // Adapt target day to recovery mobility
           const original = {
             title: targetDay.originalTitle || targetDay.title,
             durationMinutes: targetDay.originalDurationMinutes || targetDay.durationMinutes,
@@ -330,7 +490,7 @@ export class AdaptivePlanEngine {
             intensity: 'low' as const
           };
 
-          this.currentPlan[targetDayIdx] = {
+          targetPlan[targetDayIdx] = {
             ...targetDay,
             title: adapted.title,
             plannedSession: adapted.title,
@@ -346,16 +506,16 @@ export class AdaptivePlanEngine {
             status: 'adapted'
           };
 
-          // Find later day in the week to absorb the deferred session (e.g. Day 4 or 5)
-          const laterDayIdx = this.currentPlan.findIndex((d, idx) => 
+          // Find later day in the week to absorb the deferred session
+          const laterDayIdx = targetPlan.findIndex((d, idx) => 
             idx > targetDayIdx && 
             (d.status === 'scheduled') && 
             d.category !== 'recovery'
           );
 
           if (laterDayIdx !== -1) {
-            this.currentPlan[laterDayIdx] = {
-              ...this.currentPlan[laterDayIdx],
+            targetPlan[laterDayIdx] = {
+              ...targetPlan[laterDayIdx],
               title: original.title,
               plannedSession: original.title,
               durationMinutes: original.durationMinutes,
@@ -384,7 +544,7 @@ export class AdaptivePlanEngine {
             status: 'active'
           };
 
-          this.adaptationEvents.unshift(event);
+          targetEvents.unshift(event);
           changes.push(`Day ${targetDay.dayName}: Down-regulated to 20m restorative mobility due to fatigue.`);
           modified = true;
         }
@@ -393,8 +553,8 @@ export class AdaptivePlanEngine {
 
     // Rule 4: Time Compression (< 25 min or >= 2 'no_time' skips)
     if (timeSkipsCount >= 2 || (state.availableMinutes && state.availableMinutes <= 25)) {
-      this.currentPlan = this.currentPlan.map(day => {
-        if (day.status === 'scheduled' && day.durationMinutes > 25 && day.category === 'workout') {
+      targetPlan = targetPlan.map(day => {
+        if (day.date >= todayKey && day.status === 'scheduled' && day.durationMinutes > 25 && day.category === 'workout') {
           const original = {
             title: day.originalTitle || day.title,
             durationMinutes: day.originalDurationMinutes || day.durationMinutes,
@@ -422,7 +582,7 @@ export class AdaptivePlanEngine {
             status: 'active'
           };
 
-          this.adaptationEvents.unshift(event);
+          targetEvents.unshift(event);
           changes.push(`Day ${day.dayName}: Scaled duration from ${original.durationMinutes}m to 25m due to schedule constraints.`);
           modified = true;
 
@@ -446,8 +606,8 @@ export class AdaptivePlanEngine {
 
     // Rule 5: Environment Friction (Gym skips >= 2)
     if (gymSkipsCount >= 2) {
-      this.currentPlan = this.currentPlan.map(day => {
-        if (day.status === 'scheduled' && day.title.toLowerCase().includes('gym')) {
+      targetPlan = targetPlan.map(day => {
+        if (day.date >= todayKey && day.status === 'scheduled' && day.title.toLowerCase().includes('gym')) {
           const original = {
             title: day.originalTitle || day.title,
             durationMinutes: day.originalDurationMinutes || day.durationMinutes,
@@ -474,7 +634,7 @@ export class AdaptivePlanEngine {
             status: 'active'
           };
 
-          this.adaptationEvents.unshift(event);
+          targetEvents.unshift(event);
           changes.push(`Day ${day.dayName}: Converted Gym session to Home Dumbbell equivalent.`);
           modified = true;
 
@@ -497,18 +657,17 @@ export class AdaptivePlanEngine {
 
     // Rule 6: Strong Momentum Rebound
     if (state.behavioralMomentum >= 75 && recentCompleted.length >= 3 && !isFatiguedOrSleepDeprived) {
-      // Rebound: check if any previously down-regulated day can safely return to baseline progression
-      const adaptedRecoveryDay = this.currentPlan.find(d => 
+      const adaptedRecoveryDay = targetPlan.find(d => 
+        d.date >= todayKey &&
         d.status === 'adapted' && 
         d.category === 'recovery' && 
         d.originalIntensity === 'high'
       );
 
       if (adaptedRecoveryDay && state.recoveryReadiness >= 75) {
-        // High recovery restored! Can restore progression
-        const idx = this.currentPlan.indexOf(adaptedRecoveryDay);
+        const idx = targetPlan.indexOf(adaptedRecoveryDay);
         if (idx !== -1) {
-          this.currentPlan[idx] = {
+          targetPlan[idx] = {
             ...adaptedRecoveryDay,
             title: adaptedRecoveryDay.originalTitle || '30-Min High-Intensity Threshold Intervals',
             plannedSession: adaptedRecoveryDay.originalTitle || '30-Min High-Intensity Threshold Intervals',
@@ -521,7 +680,7 @@ export class AdaptivePlanEngine {
             status: 'scheduled'
           };
 
-          this.adaptationEvents.unshift({
+          targetEvents.unshift({
             id: `adapt-rebound-${Date.now()}`,
             timestamp: new Date().toISOString(),
             dayId: adaptedRecoveryDay.id || `day-${idx}`,
@@ -549,11 +708,13 @@ export class AdaptivePlanEngine {
       }
     }
 
+    this.currentPlan = targetPlan;
+    this.adaptationEvents = targetEvents;
     this.lastRebalancedAt = new Date().toISOString();
 
     return {
-      plan: [...this.currentPlan],
-      events: [...this.adaptationEvents],
+      plan: targetPlan,
+      events: targetEvents,
       changesMade: modified,
       reasons: changes.length > 0 ? changes : ['All scheduled sessions align with current evolving readiness and evidence thresholds.']
     };
@@ -563,7 +724,7 @@ export class AdaptivePlanEngine {
    * Updates matching day when an outcome is logged
    */
   public recordOutcomeInPlan(outcome: RecommendationOutcome): void {
-    const outcomeDate = outcome.timestamp.split('T')[0];
+    const outcomeDate = outcome.timestamp ? outcome.timestamp.split('T')[0] : (outcome as any).date;
     const matchIdx = this.currentPlan.findIndex(d => d.date === outcomeDate);
 
     if (matchIdx !== -1) {
@@ -602,7 +763,7 @@ export class AdaptivePlanEngine {
       dataSufficiencyNotice = `Preliminary evidence based on ${totalOutcomes} recorded outcomes. Adaptations require repeated barrier confirmation.`;
     }
 
-    const momentumScore = state.behavioralMomentum ?? 65;
+    const momentumScore = state?.behavioralMomentum ?? 65;
     let momentumStatus: 'Strong' | 'Moderate' | 'Low' = 'Moderate';
     if (momentumScore >= 75) momentumStatus = 'Strong';
     else if (momentumScore < 45) momentumStatus = 'Low';
@@ -611,7 +772,7 @@ export class AdaptivePlanEngine {
 
     return {
       days: [...this.currentPlan],
-      baselineDays: [...this.BASELINE_PLAN],
+      baselineDays: [...this.baselinePlan],
       adaptationEvents: [...this.adaptationEvents],
       lastRebalancedAt: this.lastRebalancedAt,
       momentumStatus,
@@ -627,15 +788,15 @@ export class AdaptivePlanEngine {
   }
 
   public getBaselineDays(): AdaptivePlanDay[] {
-    return [...this.BASELINE_PLAN];
+    return [...this.baselinePlan];
   }
 
   public getAdaptationEvents(): PlanAdaptationEvent[] {
     return [...this.adaptationEvents];
   }
 
-  public resetToBaseline(): AdaptivePlanPayload {
-    this.initDefaultPlan();
+  public resetToBaseline(refDate: Date = new Date()): AdaptivePlanPayload {
+    this.initDefaultPlan(refDate);
     this.lastRebalancedAt = new Date().toISOString();
 
     this.adaptationEvents.unshift({
@@ -643,7 +804,7 @@ export class AdaptivePlanEngine {
       timestamp: new Date().toISOString(),
       dayId: 'all',
       dayOfWeek: 'All Days',
-      date: new Date().toISOString().split('T')[0],
+      date: formatDateKey(refDate),
       triggerType: 'manual_rebalance',
       triggeringEvidence: 'User triggered reset to baseline research schedule.',
       originalSession: {
@@ -662,7 +823,7 @@ export class AdaptivePlanEngine {
 
     return {
       days: [...this.currentPlan],
-      baselineDays: [...this.BASELINE_PLAN],
+      baselineDays: [...this.baselinePlan],
       adaptationEvents: [...this.adaptationEvents],
       lastRebalancedAt: this.lastRebalancedAt,
       momentumStatus: 'Moderate',

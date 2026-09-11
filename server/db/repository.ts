@@ -25,6 +25,7 @@ import {
   AdaptivePlanPayload
 } from '../../src/types/index.js';
 import { adaptivePlanEngine } from '../engine/adaptivePlanEngine.js';
+import { getWeekDates, isPast, isToday } from '../../src/utils/dateUtils.js';
 import { connectMongoDB, isMongoDBConnected } from './mongoConnect.js';
 import { getMongoModels } from './models.js';
 
@@ -819,7 +820,18 @@ export class PersistentHealthPilotDB {
   }
 
   public getAdaptivePlanPayload(userId: string = 'user-001'): AdaptivePlanPayload {
-    if (!this.adaptivePlans[userId]) {
+    const currentWeek = getWeekDates(new Date());
+    const currentWeekStart = currentWeek[0].date;
+
+    const existing = this.adaptivePlans[userId];
+    const needsRefresh = !existing || 
+      !existing.days || 
+      existing.days.length === 0 || 
+      !existing.days[0]?.date ||
+      existing.days[0]?.date === 'Today' ||
+      existing.days[0]?.date !== currentWeekStart;
+
+    if (needsRefresh) {
       this.adaptivePlans[userId] = this.createInitialPlanPayload(userId);
       this.persist();
     }
@@ -859,99 +871,68 @@ export class PersistentHealthPilotDB {
   }
 
   private createInitialPlanPayload(userId: string): AdaptivePlanPayload {
-    const days: AdaptivePlanDay[] = [
+    const weekDates = getWeekDates(new Date());
+    const templateDays = [
       {
-        id: `plan-${userId}-1`,
-        dayOfWeek: 'Monday',
-        dayName: 'Monday',
-        date: 'Today',
         title: '20-Min Restorative Spinal Mobility & Breathwork',
-        plannedSession: '20-Min Restorative Spinal Mobility & Breathwork',
-        category: 'recovery',
+        category: 'recovery' as const,
         durationMinutes: 20,
-        intensity: 'low',
-        isAdaptiveAdapted: false,
-        status: 'scheduled'
+        intensity: 'low' as const
       },
       {
-        id: `plan-${userId}-2`,
-        dayOfWeek: 'Tuesday',
-        dayName: 'Tuesday',
-        date: 'Tomorrow',
         title: '25-Min Home Dumbbell Functional Strength',
-        plannedSession: '25-Min Home Dumbbell Functional Strength',
-        category: 'workout',
+        category: 'workout' as const,
         durationMinutes: 25,
-        intensity: 'moderate',
-        isAdaptiveAdapted: false,
-        status: 'scheduled'
+        intensity: 'moderate' as const
       },
       {
-        id: `plan-${userId}-3`,
-        dayOfWeek: 'Wednesday',
-        dayName: 'Wednesday',
-        date: 'In 2 days',
         title: '30-Min Aerobic Zone 2 Cardio Flow',
-        plannedSession: '30-Min Aerobic Zone 2 Cardio Flow',
-        category: 'workout',
+        category: 'workout' as const,
         durationMinutes: 30,
-        intensity: 'moderate',
-        isAdaptiveAdapted: false,
-        status: 'scheduled'
+        intensity: 'moderate' as const
       },
       {
-        id: `plan-${userId}-4`,
-        dayOfWeek: 'Thursday',
-        dayName: 'Thursday',
-        date: 'In 3 days',
         title: 'Active Rest & Parasympathetic Walk',
-        plannedSession: 'Active Rest & Parasympathetic Walk',
-        category: 'active_rest',
+        category: 'active_rest' as const,
         durationMinutes: 25,
-        intensity: 'low',
-        isAdaptiveAdapted: false,
-        status: 'scheduled'
+        intensity: 'low' as const
       },
       {
-        id: `plan-${userId}-5`,
-        dayOfWeek: 'Friday',
-        dayName: 'Friday',
-        date: 'In 4 days',
         title: 'Threshold Interval Circuit (HIIT)',
-        plannedSession: 'Threshold Interval Circuit (HIIT)',
-        category: 'workout',
+        category: 'workout' as const,
         durationMinutes: 30,
-        intensity: 'high',
-        isAdaptiveAdapted: false,
-        status: 'scheduled'
+        intensity: 'high' as const
       },
       {
-        id: `plan-${userId}-6`,
-        dayOfWeek: 'Saturday',
-        dayName: 'Saturday',
-        date: 'In 5 days',
         title: 'Full Body Functional Mobility & Core',
-        plannedSession: 'Full Body Functional Mobility & Core',
-        category: 'workout',
+        category: 'workout' as const,
         durationMinutes: 30,
-        intensity: 'moderate',
-        isAdaptiveAdapted: false,
-        status: 'scheduled'
+        intensity: 'moderate' as const
       },
       {
-        id: `plan-${userId}-7`,
-        dayOfWeek: 'Sunday',
-        dayName: 'Sunday',
-        date: 'In 6 days',
         title: 'Deload & Deep Tissue Recovery Flow',
-        plannedSession: 'Deload & Deep Tissue Recovery Flow',
-        category: 'recovery',
+        category: 'recovery' as const,
         durationMinutes: 30,
-        intensity: 'low',
-        isAdaptiveAdapted: false,
-        status: 'scheduled'
+        intensity: 'low' as const
       }
     ];
+
+    const days: AdaptivePlanDay[] = weekDates.map((w, idx) => {
+      const t = templateDays[idx % templateDays.length];
+      return {
+        id: `plan-${userId}-${idx + 1}`,
+        dayOfWeek: w.dayOfWeek,
+        dayName: w.dayOfWeek,
+        date: w.date,
+        title: t.title,
+        plannedSession: t.title,
+        category: t.category,
+        durationMinutes: t.durationMinutes,
+        intensity: t.intensity,
+        isAdaptiveAdapted: false,
+        status: isPast(w.date) ? 'completed' : 'scheduled'
+      };
+    });
 
     return {
       days,
@@ -961,8 +942,8 @@ export class PersistentHealthPilotDB {
       momentumStatus: 'Moderate',
       momentumScore: 65,
       adaptationEvents: [],
-      dataSufficiency: 'insufficient',
-      dataSufficiencyNotice: 'Initial baseline plan awaiting longitudinal outcomes.'
+      dataSufficiency: 'moderate',
+      dataSufficiencyNotice: 'Active calendar plan aligned to current week.'
     };
   }
 

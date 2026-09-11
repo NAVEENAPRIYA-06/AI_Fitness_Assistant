@@ -50,6 +50,7 @@ interface HealthPilotContextType {
   isOnboardingModalOpen: boolean;
   setIsOnboardingModalOpen: (open: boolean) => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginDemo: () => Promise<{ success: boolean; error?: string }>;
   signup: (email: string, password: string, name?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   completeOnboarding: (profileData: Partial<UserProfile>) => Promise<{ success: boolean; error?: string }>;
@@ -97,22 +98,9 @@ interface HealthPilotContextType {
 const HealthPilotContext = createContext<HealthPilotContextType | undefined>(undefined);
 
 export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(() => {
-    try {
-      const saved = typeof window !== 'undefined' ? localStorage.getItem('healthpilot_user') : null;
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-
-  const [token, setToken] = useState<string | null>(() => {
-    try {
-      return typeof window !== 'undefined' ? localStorage.getItem('healthpilot_jwt_token') : null;
-    } catch {
-      return null;
-    }
-  });
+  // Browser opens/reloads -> Always start unauthenticated to show Authentication Landing Page
+  const [token, setToken] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState<boolean>(false);
@@ -139,15 +127,14 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [predictionRecords, setPredictionRecords] = useState<AdherencePredictionRecord[]>([]);
   const [isTrainingML, setIsTrainingML] = useState<boolean>(false);
 
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isSavingContext, setIsSavingContext] = useState<boolean>(false);
   const [isSubmittingOutcome, setIsSubmittingOutcome] = useState<boolean>(false);
   const [isSendingChat, setIsSendingChat] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const getAuthHeaders = useCallback((): Record<string, string> => {
-    const t = token || (typeof window !== 'undefined' ? localStorage.getItem('healthpilot_jwt_token') : null);
-    return t ? { 'Authorization': `Bearer ${t}` } : {};
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
   }, [token]);
 
   const authFetch = useCallback((url: string, options: RequestInit = {}) => {
@@ -182,8 +169,8 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [authFetch]);
 
-  const fetchInitialData = useCallback(async () => {
-    const activeToken = token || (typeof window !== 'undefined' ? localStorage.getItem('healthpilot_jwt_token') : null);
+  const fetchInitialData = useCallback(async (tokenOverride?: string) => {
+    const activeToken = tokenOverride || token;
     if (!activeToken) {
       setIsLoading(false);
       return;
@@ -191,6 +178,8 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     setIsLoading(true);
     setError(null);
+    const authHeaders = { Authorization: `Bearer ${activeToken}` };
+    const authGet = (url: string) => fetch(url, { headers: authHeaders });
     try {
       const [
         profRes,
@@ -207,19 +196,19 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
         predsRes,
         recHistRes
       ] = await Promise.all([
-        authFetch('/api/user/profile').then(r => r.json()),
-        authFetch('/api/context/latest').then(r => r.json()),
-        authFetch('/api/context/history').then(r => r.json()),
-        authFetch('/api/state').then(r => r.json()),
-        authFetch('/api/recommendation/today').then(r => r.json()),
-        authFetch('/api/outcomes').then(r => r.json()),
-        authFetch('/api/behavior/insights').then(r => r.json()),
-        authFetch('/api/goals').then(r => r.json()),
-        authFetch('/api/plan/adaptive').then(r => r.json()),
-        authFetch('/api/adaptive-plan').then(r => r.json()).catch(() => null),
-        authFetch('/api/ml/model').then(r => r.ok ? r.json() : null).catch(() => null),
-        authFetch('/api/ml/predictions').then(r => r.ok ? r.json() : null).catch(() => null),
-        authFetch('/api/recommendations/history').then(r => r.ok ? r.json() : []).catch(() => [])
+        authGet('/api/user/profile').then(r => r.json()),
+        authGet('/api/context/latest').then(r => r.json()),
+        authGet('/api/context/history').then(r => r.json()),
+        authGet('/api/state').then(r => r.json()),
+        authGet('/api/recommendation/today').then(r => r.json()),
+        authGet('/api/outcomes').then(r => r.json()),
+        authGet('/api/behavior/insights').then(r => r.json()),
+        authGet('/api/goals').then(r => r.json()),
+        authGet('/api/plan/adaptive').then(r => r.json()),
+        authGet('/api/adaptive-plan').then(r => r.json()).catch(() => null),
+        authGet('/api/ml/model').then(r => r.ok ? r.json() : null).catch(() => null),
+        authGet('/api/ml/predictions').then(r => r.ok ? r.json() : null).catch(() => null),
+        authGet('/api/recommendations/history').then(r => r.ok ? r.json() : []).catch(() => [])
       ]);
 
       setProfile(profRes && !profRes.error ? profRes : initialProfile);
@@ -291,52 +280,9 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [authFetch, token]);
 
-  // Authenticate session on mount if token exists
-  useEffect(() => {
-    let isMounted = true;
-    const initAuth = async () => {
-      const storedToken = typeof window !== 'undefined' ? localStorage.getItem('healthpilot_jwt_token') : null;
-      if (storedToken) {
-        try {
-          const res = await fetch('/api/auth/me', {
-            headers: { Authorization: `Bearer ${storedToken}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (isMounted) {
-              setCurrentUser(data.user);
-              setToken(storedToken);
-              localStorage.setItem('healthpilot_user', JSON.stringify(data.user));
-              await fetchInitialData();
-              return;
-            }
-          } else {
-            // Token invalid or expired - clean session
-            if (typeof window !== 'undefined') {
-              localStorage.removeItem('healthpilot_jwt_token');
-              localStorage.removeItem('healthpilot_user');
-            }
-            if (isMounted) {
-              setCurrentUser(null);
-              setToken(null);
-            }
-          }
-        } catch {
-          // Network error or server offline
-        }
-      } else {
-        if (isMounted) {
-          setCurrentUser(null);
-          setToken(null);
-        }
-      }
-      if (isMounted) {
-        setIsLoading(false);
-      }
-    };
-    initAuth();
-    return () => { isMounted = false; };
-  }, [fetchInitialData]);
+  // Startup behavior: On initial open or browser reload, HealthPilot AI displays
+  // the Authentication Landing Page instead of automatically reopening previous modules.
+  // Data in MongoDB is fully preserved and loaded upon user sign-in.
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -347,21 +293,28 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
       });
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.error || 'Login failed' };
+        return { success: false, error: data.error || 'Unable to sign in. Please check your email and password.' };
       }
       setToken(data.token);
       setCurrentUser(data.user);
-      localStorage.setItem('healthpilot_jwt_token', data.token);
-      localStorage.setItem('healthpilot_user', JSON.stringify(data.user));
+      try {
+        localStorage.setItem('healthpilot_jwt_token', data.token);
+        localStorage.setItem('healthpilot_user', JSON.stringify(data.user));
+      } catch {}
       setIsAuthModalOpen(false);
+      setActiveModule('today');
       if (!data.user.onboardingComplete) {
         setIsOnboardingModalOpen(true);
       }
-      setTimeout(() => fetchInitialData(), 50);
+      await fetchInitialData(data.token);
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Network error during login' };
+      return { success: false, error: err.message || 'Something went wrong. Please try again.' };
     }
+  };
+
+  const loginDemo = async (): Promise<{ success: boolean; error?: string }> => {
+    return { success: false, error: 'Demo mode is disabled.' };
   };
 
   const signup = async (email: string, password: string, name?: string): Promise<{ success: boolean; error?: string }> => {
@@ -373,18 +326,21 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
       });
       const data = await res.json();
       if (!res.ok) {
-        return { success: false, error: data.error || 'Signup failed' };
+        return { success: false, error: data.error || 'Signup failed. Please try again.' };
       }
       setToken(data.token);
       setCurrentUser(data.user);
-      localStorage.setItem('healthpilot_jwt_token', data.token);
-      localStorage.setItem('healthpilot_user', JSON.stringify(data.user));
+      try {
+        localStorage.setItem('healthpilot_jwt_token', data.token);
+        localStorage.setItem('healthpilot_user', JSON.stringify(data.user));
+      } catch {}
       setIsAuthModalOpen(false);
+      setActiveModule('today');
       setIsOnboardingModalOpen(true);
-      setTimeout(() => fetchInitialData(), 50);
+      await fetchInitialData(data.token);
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || 'Network error during signup' };
+      return { success: false, error: err.message || 'Something went wrong. Please try again.' };
     }
   };
 
@@ -404,8 +360,13 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
     setAdaptivePlanPayload(null);
     setPredictionRecords([]);
     setChatMessages([]);
-    localStorage.removeItem('healthpilot_jwt_token');
-    localStorage.removeItem('healthpilot_user');
+    setActiveModule('today');
+    setIsAuthModalOpen(false);
+    setIsOnboardingModalOpen(false);
+    try {
+      localStorage.removeItem('healthpilot_jwt_token');
+      localStorage.removeItem('healthpilot_user');
+    } catch {}
     fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
   };
 
@@ -777,6 +738,7 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
         isOnboardingModalOpen,
         setIsOnboardingModalOpen,
         login,
+        loginDemo,
         signup,
         logout,
         completeOnboarding,

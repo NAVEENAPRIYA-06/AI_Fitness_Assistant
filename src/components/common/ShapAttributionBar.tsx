@@ -9,7 +9,7 @@ interface ShapAttributionBarProps {
 
 export const ShapAttributionBar: React.FC<ShapAttributionBarProps> = ({
   factors,
-  title = 'Explainable Decision Attribution (SHAP-Inspired)'
+  title = 'Influencing Decision Factors'
 }) => {
   return (
     <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 shadow-xs">
@@ -17,11 +17,11 @@ export const ShapAttributionBar: React.FC<ShapAttributionBarProps> = ({
         <div>
           <h4 className="text-sm font-bold text-white tracking-tight">{title}</h4>
           <p className="text-xs text-slate-400 mt-0.5">
-            Empirical feature weights influencing adherence prediction and health suitability
+            Key context conditions influencing adherence prediction and health suitability
           </p>
         </div>
         <span className="text-[10px] font-mono px-2 py-0.5 rounded uppercase tracking-wider bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/30">
-          XAI Engine
+          Decision Intelligence
         </span>
       </div>
 

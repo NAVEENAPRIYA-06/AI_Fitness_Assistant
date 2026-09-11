@@ -40,21 +40,21 @@ export const OnboardingModal: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-fade-in">
-      <div className="relative w-full max-w-lg bg-[#121215] border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
+      <div className="relative w-full max-w-lg bg-[var(--surface)] text-[var(--text-primary)] border border-[var(--border)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-6 border-b border-slate-800/80 bg-slate-900/50">
+        <div className="p-6 border-b border-[var(--border)] bg-[var(--surface-soft)]">
           <div className="flex items-center gap-2.5 mb-1.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-              <Sparkles className="w-4 h-4" />
+            <div className="w-8 h-8 rounded-lg bg-[var(--primary)] text-white flex items-center justify-center shadow-xs">
+              <Sparkles className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-white tracking-tight">Initialize Your Physiological Profile</h2>
-              <p className="text-xs text-slate-400">Calibrating Decision Intelligence & Baseline Thresholds</p>
+              <h2 className="text-base font-bold text-[var(--text-primary)] tracking-tight">Initialize Your Physiological Profile</h2>
+              <p className="text-xs text-[var(--text-secondary)]">Calibrating Decision Intelligence & Baseline Thresholds</p>
             </div>
           </div>
-          <p className="text-xs text-slate-400 mt-2">
-            Welcome, <span className="text-white font-medium">{currentUser?.name}</span>! HealthPilot requires your baseline metrics to calibrate multi-objective candidate scoring and physiological guardrails.
+          <p className="text-xs text-[var(--text-secondary)] mt-2">
+            Welcome, <span className="text-[var(--text-primary)] font-semibold">{currentUser?.name}</span>! HealthPilot requires your baseline metrics to calibrate multi-objective candidate scoring and physiological guardrails.
           </p>
         </div>
 
@@ -62,8 +62,8 @@ export const OnboardingModal: React.FC = () => {
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5 flex-1 custom-scrollbar">
           {/* Goal Category */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-              <Target className="w-3.5 h-3.5 text-emerald-400" />
+            <label className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+              <Target className="w-3.5 h-3.5 text-[var(--primary)]" />
               Primary Focus Area
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -77,10 +77,10 @@ export const OnboardingModal: React.FC = () => {
                   key={cat.id}
                   type="button"
                   onClick={() => setGoalCategory(cat.id as any)}
-                  className={`p-2.5 rounded-xl border text-left text-xs transition-all ${
+                  className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
                     goalCategory === cat.id
-                      ? 'bg-emerald-500/10 border-emerald-500/40 text-white font-semibold'
-                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-slate-200'
+                      ? 'bg-[var(--primary-soft)] border-[var(--primary)]/40 text-[var(--primary)] font-semibold'
+                      : 'bg-[var(--surface-soft)] border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                   }`}
                 >
                   {cat.label}
@@ -91,43 +91,43 @@ export const OnboardingModal: React.FC = () => {
 
           {/* Goal Statement */}
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-300">Long-Term Goal Statement</label>
+            <label className="text-xs font-medium text-[var(--text-secondary)]">Long-Term Goal Statement</label>
             <input
               type="text"
               required
               value={primaryGoal}
               onChange={(e) => setPrimaryGoal(e.target.value)}
               placeholder="e.g. Sub-3:30 Marathon or 500lb Powerlifting Total"
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500"
+              className="w-full px-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)]"
             />
           </div>
 
           {/* Physiological Metrics Grid */}
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300">Age</label>
+              <label className="text-xs font-medium text-[var(--text-secondary)]">Age</label>
               <input
                 type="number"
                 min="18"
                 max="99"
                 value={age}
                 onChange={(e) => setAge(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                className="w-full px-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300">Resting HR (bpm)</label>
+              <label className="text-xs font-medium text-[var(--text-secondary)]">Resting HR (bpm)</label>
               <input
                 type="number"
                 min="35"
                 max="110"
                 value={restingHeartRate}
                 onChange={(e) => setRestingHeartRate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                className="w-full px-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300">Target Sleep (hrs)</label>
+              <label className="text-xs font-medium text-[var(--text-secondary)]">Target Sleep (hrs)</label>
               <input
                 type="number"
                 step="0.5"
@@ -135,7 +135,7 @@ export const OnboardingModal: React.FC = () => {
                 max="12"
                 value={targetSleep}
                 onChange={(e) => setTargetSleep(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                className="w-full px-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               />
             </div>
           </div>
@@ -143,14 +143,14 @@ export const OnboardingModal: React.FC = () => {
           {/* Environment and Session Duration */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <label className="text-xs font-medium text-[var(--text-secondary)] flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                 Default Environment
               </label>
               <select
                 value={preferredEnvironment}
                 onChange={(e) => setPreferredEnvironment(e.target.value as any)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                className="w-full px-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               >
                 <option value="home">Home (Minimal Equipment)</option>
                 <option value="gym">Commercial Gym / Facility</option>
@@ -158,14 +158,14 @@ export const OnboardingModal: React.FC = () => {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-medium text-slate-300 flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <label className="text-xs font-medium text-[var(--text-secondary)] flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5 text-[var(--text-muted)]" />
                 Typical Session (min)
               </label>
               <select
                 value={weeklyAvailability}
                 onChange={(e) => setWeeklyAvailability(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white focus:outline-hidden focus:border-emerald-500"
+                className="w-full px-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-primary)] focus:outline-hidden focus:border-[var(--primary)]"
               >
                 <option value="20">20 Minutes (Micro-Session)</option>
                 <option value="35">35 Minutes (Balanced)</option>
@@ -177,8 +177,8 @@ export const OnboardingModal: React.FC = () => {
 
           {/* Physical Limitations */}
           <div className="space-y-1">
-            <label className="text-xs font-medium text-slate-300 flex items-center gap-1.5">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+            <label className="text-xs font-medium text-[var(--text-secondary)] flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
               Contraindications or Physical Sensitivity (Optional)
             </label>
             <input
@@ -186,9 +186,9 @@ export const OnboardingModal: React.FC = () => {
               value={limitations}
               onChange={(e) => setLimitations(e.target.value)}
               placeholder="e.g. Mild lumbar extension sensitivity, patellar tracking, none"
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500"
+              className="w-full px-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-lg text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)]"
             />
-            <p className="text-[11px] text-slate-500">
+            <p className="text-[11px] text-[var(--text-muted)]">
               The Decision Intelligence Engine automatically applies safety penalties to high-impact spinal or knee loads when acute fatigue is detected.
             </p>
           </div>
@@ -198,7 +198,7 @@ export const OnboardingModal: React.FC = () => {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-[#0A0A0B] bg-emerald-500 hover:bg-emerald-400 transition-all shadow-md disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] transition-all shadow-md shadow-[var(--primary)]/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
               {isSubmitting ? (
                 <span>Initializing Database Profile...</span>

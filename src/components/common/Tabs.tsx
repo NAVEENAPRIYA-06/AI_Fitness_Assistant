@@ -33,7 +33,7 @@ export const Tabs: React.FC<TabsProps> = ({
 
   if (variant === 'underline') {
     return (
-      <div className={`border-b border-slate-800 flex items-center gap-2 overflow-x-auto no-scrollbar ${className}`}>
+      <div className={`border-b border-[var(--border)] flex items-center gap-2 overflow-x-auto no-scrollbar ${className}`}>
         {tabs.map(tab => {
           const isActive = tab.id === activeTab;
           return (
@@ -45,15 +45,15 @@ export const Tabs: React.FC<TabsProps> = ({
               onClick={() => onChange(tab.id)}
               className={`flex items-center font-medium border-b-2 transition-all whitespace-nowrap py-2.5 px-3 text-xs sm:text-sm cursor-pointer ${
                 isActive
-                  ? 'border-emerald-500 text-emerald-400 font-semibold'
-                  : 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                  ? 'border-[var(--primary)] text-[var(--primary)] font-semibold'
+                  : 'border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--border)]'
               }`}
             >
               {tab.icon && <span className="flex-shrink-0">{tab.icon}</span>}
               <span>{tab.label}</span>
               {tab.badge !== undefined && (
                 <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                  isActive ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'
+                  isActive ? 'bg-[var(--primary-soft)] text-[var(--primary)]' : 'bg-[var(--surface-soft)] text-[var(--text-muted)]'
                 }`}>
                   {tab.badge}
                 </span>
@@ -66,7 +66,7 @@ export const Tabs: React.FC<TabsProps> = ({
   }
 
   return (
-    <div className={`flex items-center gap-1.5 p-1 bg-slate-900/90 border border-slate-800 rounded-xl overflow-x-auto no-scrollbar ${className}`}>
+    <div className={`flex items-center gap-1.5 p-1 bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl overflow-x-auto no-scrollbar ${className}`}>
       {tabs.map(tab => {
         const isActive = tab.id === activeTab;
         return (
@@ -78,15 +78,15 @@ export const Tabs: React.FC<TabsProps> = ({
             onClick={() => onChange(tab.id)}
             className={`flex items-center rounded-lg font-medium transition-all whitespace-nowrap cursor-pointer ${sizeClasses} ${
               isActive
-                ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent'
+                ? 'bg-[var(--surface)] text-[var(--primary)] border border-[var(--primary)]/30 font-semibold shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface)]/50 border border-transparent'
             }`}
           >
             {tab.icon && <span className="flex-shrink-0">{tab.icon}</span>}
             <span>{tab.label}</span>
             {tab.badge !== undefined && (
               <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ml-0.5 ${
-                isActive ? 'bg-emerald-500/25 text-emerald-200' : 'bg-slate-800 text-slate-400'
+                isActive ? 'bg-[var(--primary-soft)] text-[var(--primary)]' : 'bg-[var(--border)] text-[var(--text-muted)]'
               }`}>
                 {tab.badge}
               </span>

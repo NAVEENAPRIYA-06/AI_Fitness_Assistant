@@ -9,240 +9,506 @@ import {
   AlertCircle,
   Eye,
   EyeOff,
-  Sparkles,
   Compass,
-  Brain,
-  CalendarDays
+  Sliders,
+  CheckCircle2,
+  Sun,
+  Moon,
+  Loader2
 } from 'lucide-react';
 import { useHealthPilot } from '../../context/HealthPilotContext.js';
+import { useTheme } from '../../context/ThemeContext.js';
 
 export const AuthPage: React.FC = () => {
   const { login, signup } = useHealthPilot();
+  const { theme, toggleTheme } = useTheme();
+
   const [mode, setMode] = useState<'login' | 'signup'>('login');
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const switchMode = (newMode: 'login' | 'signup') => {
+    setMode(newMode);
+    setError(null);
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  };
+
+  const validate = (): string | null => {
+    const trimmedEmail = email.trim().toLowerCase();
+
+    if (!trimmedEmail) {
+      return 'Please enter your email address.';
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      return 'Please enter a valid email address.';
+    }
+
+    if (mode === 'login') {
+      if (!password) {
+        return 'Please enter your password.';
+      }
+      return null;
+    }
+
+    // Create Account validations
+    if (!name.trim()) {
+      return 'Please enter your full name.';
+    }
+
+    if (!password) {
+      return 'Please enter a password.';
+    }
+
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters.';
+    }
+
+    if (!confirmPassword) {
+      return 'Please confirm your password.';
+    }
+
+    if (password !== confirmPassword) {
+      return 'Passwords do not match.';
+    }
+
+    return null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     const trimmedEmail = email.trim().toLowerCase();
-    if (!trimmedEmail || !trimmedEmail.includes('@') || !trimmedEmail.includes('.')) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
-
-    if (mode === 'signup' && !name.trim()) {
-      setError('Please enter your full name.');
-      return;
-    }
-
     setIsSubmitting(true);
+
     try {
       if (mode === 'login') {
         const result = await login(trimmedEmail, password);
         if (!result.success) {
-          setError(result.error || 'Invalid email or password.');
+          if (result.error?.toLowerCase().includes('credential') || result.error?.toLowerCase().includes('invalid') || result.error?.toLowerCase().includes('password')) {
+            setError('Unable to sign in. Please check your email and password.');
+          } else if (result.error?.toLowerCase().includes('network') || result.error?.toLowerCase().includes('fetch')) {
+            setError('Unable to reach the server. Please check your internet connection and try again.');
+          } else {
+            setError(result.error || 'Unable to sign in. Please check your email and password.');
+          }
         }
       } else {
         const result = await signup(trimmedEmail, password, name.trim());
         if (!result.success) {
-          setError(result.error || 'Failed to create account.');
+          if (result.error?.toLowerCase().includes('already exists') || result.error?.toLowerCase().includes('duplicate')) {
+            setError('An account with this email already exists. Please sign in instead.');
+          } else if (result.error?.toLowerCase().includes('network') || result.error?.toLowerCase().includes('fetch')) {
+            setError('Unable to reach the server. Please check your internet connection and try again.');
+          } else {
+            setError(result.error || 'Something went wrong. Please try again.');
+          }
         }
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected authentication error occurred.');
+    } catch {
+      setError('Something went wrong. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#070709] text-slate-100 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      {/* Background ambient lighting */}
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-[var(--background)] text-[var(--text-primary)] flex flex-col justify-between selection:bg-[var(--primary)] selection:text-white transition-colors duration-200">
+      {/* Subtle ambient wellness background glow */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-emerald-500/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 left-1/3 w-[500px] h-[350px] bg-indigo-500/5 rounded-full blur-3xl" />
+        <div className="absolute -top-32 -left-32 w-96 h-96 bg-[var(--primary)]/10 rounded-full blur-3xl opacity-70" />
+        <div className="absolute top-1/2 -right-32 w-96 h-96 bg-[var(--peach-soft)]/60 rounded-full blur-3xl opacity-80" />
       </div>
 
-      <div className="relative z-10 sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Brand Header */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 mb-4 shadow-lg shadow-emerald-500/5">
-            <Activity className="w-6 h-6 text-emerald-400" />
+      {/* Simplified Header */}
+      <header className="relative z-10 w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 sm:py-4 flex items-center justify-between shrink-0">
+        {/* Brand */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-[var(--primary)] text-white flex items-center justify-center shadow-sm">
+            <Activity className="w-5 h-5 text-white" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center justify-center gap-1.5">
-            HealthPilot <span className="text-emerald-400 font-light text-xl">AI</span>
-          </h1>
-          <p className="text-sm text-slate-400 mt-2 font-normal">
-            Physiological Decision Intelligence & Adaptive Health
-          </p>
+          <span className="text-lg font-bold tracking-tight text-[var(--text-primary)]">
+            HealthPilot <span className="text-[var(--primary)] font-normal">AI</span>
+          </span>
         </div>
 
-        {/* Card Container */}
-        <div className="bg-[#101014] border border-slate-800/90 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
-          {/* Mode Switcher Tabs */}
-          <div className="grid grid-cols-2 p-1 bg-slate-900/90 rounded-xl border border-slate-800/80 mb-6">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('login');
-                setError(null);
-              }}
-              className={`py-2 text-xs font-semibold rounded-lg transition-all ${
-                mode === 'login'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signup');
-                setError(null);
-              }}
-              className={`py-2 text-xs font-semibold rounded-lg transition-all ${
-                mode === 'signup'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Create Account
-            </button>
-          </div>
-
-          {/* Error Notice */}
-          {error && (
-            <div className="mb-5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2.5 text-xs text-rose-300">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-              <span>{error}</span>
-            </div>
-          )}
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'signup' && (
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Jane Doe"
-                    autoComplete="name"
-                    className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-500" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  autoComplete="email"
-                  className="w-full pl-10 pr-3.5 py-2.5 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-500" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-colors"
-                />
+        {/* Top-Right Context Controls: Switch Prompt & Theme Toggle */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)]">
+            {mode === 'login' ? (
+              <>
+                <span className="hidden sm:inline">New here?</span>
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-2.5 text-slate-500 hover:text-slate-300 focus:outline-hidden"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  onClick={() => switchMode('signup')}
+                  className="px-2.5 py-1 rounded-lg font-semibold text-[var(--primary)] bg-[var(--primary-soft)] hover:opacity-90 transition-all cursor-pointer"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  Create Account
                 </button>
+              </>
+            ) : (
+              <>
+                <span className="hidden sm:inline">Already have an account?</span>
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  className="px-2.5 py-1 rounded-lg font-semibold text-[var(--primary)] bg-[var(--primary-soft)] hover:opacity-90 transition-all cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </>
+            )}
+          </div>
+
+          {/* Theme Toggle Button */}
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+            aria-label={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+            title={`Switch to ${theme === 'light' ? 'Dark' : 'Light'} Mode`}
+          >
+            {theme === 'light' ? (
+              <Moon className="w-4 h-4 text-slate-700" />
+            ) : (
+              <Sun className="w-4 h-4 text-amber-300" />
+            )}
+          </button>
+        </div>
+      </header>
+
+      {/* Main Two-Sided Content Area - Vertically Centered */}
+      <main className="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-2 sm:py-4 w-full max-w-6xl mx-auto overflow-y-auto lg:overflow-visible">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center">
+          
+          {/* ============================================================ */}
+          {/* LEFT SIDE: HERO & FITNESS BENEFITS                           */}
+          {/* ============================================================ */}
+          <div className="lg:col-span-7 flex flex-col justify-center space-y-3.5 lg:space-y-4">
+            
+            {/* Display Title & Subtitle */}
+            <div className="space-y-1 sm:space-y-1.5">
+              <span className="text-[11px] font-bold tracking-wider text-[var(--primary)] uppercase">
+                YOUR HEALTH JOURNEY STARTS HERE
+              </span>
+
+              <h1 className="text-3xl sm:text-4xl lg:text-[40px] font-extrabold tracking-tight text-[var(--text-primary)] leading-[1.12]">
+                Small Steps, <br />
+                <span className="text-[var(--primary)]">Big Changes.</span>
+              </h1>
+
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed max-w-lg">
+                Personalized guidance. Smarter decisions. <br className="hidden sm:inline" />
+                A healthier, happier you.
+              </p>
+            </div>
+
+            {/* Clean, Simple & Premium Fitness / Wellness Visual */}
+            <div className="relative w-full h-28 sm:h-32 lg:h-34 rounded-2xl overflow-hidden border border-[var(--border)] bg-gradient-to-r from-[#FFF4EE] via-[#FFEBE1] to-[#FDDCD0] dark:from-[#241A19] dark:via-[#1E1514] dark:to-[#181110] shadow-xs">
+              <svg
+                viewBox="0 0 540 136"
+                className="w-full h-full object-cover"
+                preserveAspectRatio="xMidYMid meet"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient id="skyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#FFF7F2" stopOpacity="0.9" />
+                    <stop offset="50%" stopColor="#FEE9DF" stopOpacity="0.8" />
+                    <stop offset="100%" stopColor="#FCD5C8" stopOpacity="0.7" />
+                  </linearGradient>
+                  <linearGradient id="warmSun" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="#FF9B8E" stopOpacity="0.85" />
+                    <stop offset="100%" stopColor="#F26B5E" stopOpacity="0.2" />
+                  </linearGradient>
+                  <linearGradient id="trailGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stopColor="#E49A8F" stopOpacity="0.35" />
+                    <stop offset="100%" stopColor="#D97A6D" stopOpacity="0.55" />
+                  </linearGradient>
+                </defs>
+
+                {/* Ambient Warm Daylight Rising Sun */}
+                <circle cx="390" cy="50" r="40" fill="url(#warmSun)" />
+                <circle cx="390" cy="50" r="22" fill="#FFA396" fillOpacity="0.5" />
+                <circle cx="390" cy="50" r="11" fill="#FFF4F1" fillOpacity="0.85" />
+
+                {/* Soft Horizon Hills */}
+                <path d="M 0 100 Q 120 68, 260 90 T 540 94 L 540 136 L 0 136 Z" fill="#E8A99E" fillOpacity="0.3" />
+                <path d="M 0 110 Q 180 82, 360 105 T 540 102 L 540 136 L 0 136 Z" fill="#D98275" fillOpacity="0.35" />
+
+                {/* Outdoor Nature Trail Path */}
+                <path d="M 0 124 Q 240 114, 540 122 L 540 136 L 0 136 Z" fill="url(#trailGrad)" />
+
+                {/* Clean, Realistic Silhouette of Person in Natural Outdoor Morning Activity */}
+                <g transform="translate(195, 42)" fill="#D45B4E">
+                  {/* Head with natural contour */}
+                  <ellipse cx="20" cy="11" rx="4.5" ry="5.5" />
+                  {/* Natural hair profile */}
+                  <path d="M 17 10 Q 12 13, 11 17 Q 14 16, 17 14" />
+                  {/* Athletic posture */}
+                  <path d="M 18 17 C 18 21, 16 31, 18 43 L 23 43 C 24 31, 23 21, 22 17 Z" />
+                  {/* Natural arm motion in gentle morning stride */}
+                  <path d="M 18 21 Q 10 27, 12 34 L 15 33 Q 13 28, 20 23 Z" />
+                  <path d="M 21 21 Q 28 27, 27 34 L 24 34 Q 25 28, 19 23 Z" />
+                  {/* Grounded natural legs */}
+                  <path d="M 18 43 L 14 63 L 18 64 L 20 46 Z" />
+                  <path d="M 22 43 L 27 61 L 31 63 L 24 46 Z" />
+                </g>
+              </svg>
+            </div>
+
+            {/* Three Compact Fitness Benefits */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+              <div className="p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-start gap-2.5 shadow-xs">
+                <div className="w-7 h-7 rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center shrink-0 mt-0.5">
+                  <Compass className="w-3.5 h-3.5 text-[var(--primary)]" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-xs font-bold text-[var(--text-primary)] truncate">Personalized Plans</h2>
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-tight mt-0.5">Workouts that fit your life</p>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-start gap-2.5 shadow-xs">
+                <div className="w-7 h-7 rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center shrink-0 mt-0.5">
+                  <Sliders className="w-3.5 h-3.5 text-[var(--primary)]" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-xs font-bold text-[var(--text-primary)] truncate">Adapt to You</h2>
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-tight mt-0.5">Plans that adjust as you progress</p>
+                </div>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] flex items-start gap-2.5 shadow-xs">
+                <div className="w-7 h-7 rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[var(--primary)]" />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-xs font-bold text-[var(--text-primary)] truncate">Build Better Habits</h2>
+                  <p className="text-[11px] text-[var(--text-secondary)] leading-tight mt-0.5">Simple guidance for consistent progress</p>
+                </div>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full mt-2 py-3 px-4 rounded-xl text-xs font-bold text-[#0A0A0B] bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] transition-all shadow-md shadow-emerald-500/10 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isSubmitting ? (
-                <span>Authenticating...</span>
-              ) : mode === 'login' ? (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
-              ) : (
-                <>
-                  <span>Create Account</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </>
+          </div>
+
+          {/* ============================================================ */}
+          {/* RIGHT SIDE: AUTHENTICATION CARD                              */}
+          {/* ============================================================ */}
+          <div className="lg:col-span-5 w-full max-w-sm sm:max-w-md mx-auto">
+            
+            {/* Header Above Form */}
+            <div className="text-center sm:text-left mb-3 sm:mb-3.5">
+              <div className="inline-flex lg:hidden items-center justify-center w-9 h-9 rounded-xl bg-[var(--primary)] text-white mb-1.5 shadow-sm mx-auto sm:mx-0">
+                <Activity className="w-4 h-4 text-white" />
+              </div>
+              <h2 className="text-xl sm:text-2xl font-extrabold tracking-tight text-[var(--text-primary)]">
+                HealthPilot <span className="text-[var(--primary)] font-normal">AI</span>
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium">
+                Your Personal Fitness Coach
+              </p>
+            </div>
+
+            {/* Compact Authentication Card */}
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-5 sm:p-6 shadow-md">
+              
+              {/* Two Tabs: Sign In / Create Account */}
+              <div className="grid grid-cols-2 p-1 bg-[var(--surface-soft)] rounded-xl border border-[var(--border)] mb-3.5">
+                <button
+                  type="button"
+                  onClick={() => switchMode('login')}
+                  className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    mode === 'login'
+                      ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-xs'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  Sign In
+                </button>
+                <button
+                  type="button"
+                  onClick={() => switchMode('signup')}
+                  className={`py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                    mode === 'signup'
+                      ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-xs'
+                      : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                  }`}
+                >
+                  Create Account
+                </button>
+              </div>
+
+              {/* Friendly Error Notice */}
+              {error && (
+                <div
+                  role="alert"
+                  className="mb-3.5 p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-start gap-2 text-xs text-rose-600 dark:text-rose-400 animate-in fade-in duration-150"
+                >
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                  <span className="leading-snug">{error}</span>
+                </div>
               )}
-            </button>
-          </form>
 
-          {/* Privacy & Isolation Guarantee */}
-          <div className="mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-center gap-2 text-[11px] text-slate-500">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Encrypted & Isolated Personal Health Store</span>
-          </div>
-        </div>
+              {/* Form */}
+              <form onSubmit={handleSubmit} className="space-y-3" noValidate>
+                
+                {/* Full Name (Create Account only) */}
+                {mode === 'signup' && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[var(--text-primary)] mb-1">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-2.5 w-4 h-4 text-[var(--text-muted)] pointer-events-none" />
+                      <input
+                        type="text"
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Jane Doe"
+                        autoComplete="name"
+                        className="w-full pl-9 pr-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
 
-        {/* Feature Highlights Footer */}
-        <div className="mt-8 grid grid-cols-3 gap-3 text-center">
-          <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/60">
-            <Compass className="w-4 h-4 text-emerald-400 mx-auto mb-1.5" />
-            <p className="text-[11px] font-semibold text-slate-300">Daily Decisions</p>
-            <p className="text-[10px] text-slate-500">Recovery-calibrated</p>
+                {/* Email Address */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-[var(--text-primary)] mb-1">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-2.5 w-4 h-4 text-[var(--text-muted)] pointer-events-none" />
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      className="w-full pl-9 pr-3 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 transition-all"
+                    />
+                  </div>
+                </div>
+
+                {/* Password */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[11px] font-semibold text-[var(--text-primary)]">
+                      Password
+                    </label>
+                    {mode === 'signup' && (
+                      <span className="text-[10px] text-[var(--text-muted)] font-normal">
+                        Min. 8 characters
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--text-muted)] pointer-events-none" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                      className="w-full pl-9 pr-9 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] focus:outline-hidden cursor-pointer"
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm Password (Create Account only) */}
+                {mode === 'signup' && (
+                  <div>
+                    <label className="block text-[11px] font-semibold text-[var(--text-primary)] mb-1">
+                      Confirm Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-2.5 w-4 h-4 text-[var(--text-muted)] pointer-events-none" />
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        autoComplete="new-password"
+                        className="w-full pl-9 pr-9 py-2 bg-[var(--surface-soft)] border border-[var(--border)] rounded-xl text-xs sm:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-hidden focus:border-[var(--primary)] focus:ring-1 focus:ring-[var(--primary)]/30 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-2.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] focus:outline-hidden cursor-pointer"
+                        aria-label={showConfirmPassword ? 'Hide confirmed password' : 'Show confirmed password'}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full mt-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold text-white bg-[var(--primary)] hover:bg-[var(--primary-hover)] active:scale-[0.99] transition-all shadow-sm disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <span>{mode === 'login' ? 'Signing in...' : 'Creating your account...'}</span>
+                    </>
+                  ) : mode === 'login' ? (
+                    <>
+                      <span>Sign In</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  ) : (
+                    <>
+                      <span>Create Account</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+
+              {/* Privacy & Isolation Statement */}
+              <div className="mt-3.5 pt-3 border-t border-[var(--border)] flex items-center justify-center gap-1.5 text-center text-[11px] text-[var(--text-muted)]">
+                <ShieldCheck className="w-3.5 h-3.5 text-[var(--primary)] shrink-0" />
+                <span>Your personal health data stays private and isolated.</span>
+              </div>
+
+            </div>
+
           </div>
-          <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/60">
-            <CalendarDays className="w-4 h-4 text-emerald-400 mx-auto mb-1.5" />
-            <p className="text-[11px] font-semibold text-slate-300">Adaptive Plan</p>
-            <p className="text-[10px] text-slate-500">Dynamic weekly shifts</p>
-          </div>
-          <div className="p-3 rounded-xl bg-slate-900/40 border border-slate-800/60">
-            <Brain className="w-4 h-4 text-emerald-400 mx-auto mb-1.5" />
-            <p className="text-[11px] font-semibold text-slate-300">SHAP Attributions</p>
-            <p className="text-[10px] text-slate-500">Explainable ML</p>
-          </div>
+
         </div>
-      </div>
+      </main>
     </div>
   );
 };

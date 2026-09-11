@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useHealthPilot } from '../../context/HealthPilotContext.js';
 import { DailyContext } from '../../types/index.js';
-import { TodayStateSummary } from './context/TodayStateSummary.js';
-import { ContextHistoryChart } from './context/ContextHistoryChart.js';
-import { Tabs, TabItem } from '../common/Tabs.js';
 import {
   Save,
   Moon,
   Zap,
-  BatteryCharging,
+  Battery,
   Flame,
   Activity,
   Clock,
@@ -24,99 +21,95 @@ import {
   Layers,
   ChevronRight,
   Sliders,
-  Target
+  CheckCircle2,
+  Heart
 } from 'lucide-react';
+import { ContextHistoryChart } from './context/ContextHistoryChart.js';
 
 export const MyContextView: React.FC = () => {
   const {
     context,
     contextHistory,
-    evolvingState,
-    goals,
     updateContext,
     isSavingContext,
     setActiveModule
   } = useHealthPilot();
 
-  const [activeTab, setActiveTab] = useState('daily_state');
+  const [viewTab, setViewTab] = useState<'checkin' | 'trends'>('checkin');
 
   // Local form state
   const [date, setDate] = useState<string>(
     context?.date || new Date().toISOString().split('T')[0]
   );
 
-  // PHYSICAL / RECOVERY
-  const [sleepHours, setSleepHours] = useState<number>(context?.sleepHours || 5.8);
-  const [sleepQuality, setSleepQuality] = useState<number>(context?.sleepQuality || 5);
-  const [energyLevel, setEnergyLevel] = useState<number>(context?.energyLevel || 5);
-  const [fatigueLevel, setFatigueLevel] = useState<number>(context?.fatigueLevel || 7);
-  const [sorenessLevel, setSorenessLevel] = useState<number>(context?.sorenessLevel || 6);
+  // 1. SLEEP
+  const [sleepHours, setSleepHours] = useState<number>(context?.sleepHours || 7.0);
+  const [sleepQuality, setSleepQuality] = useState<number>(context?.sleepQuality || 7);
 
-  // MENTAL / LIFESTYLE
-  const [stressLevel, setStressLevel] = useState<number>(context?.stressLevel || 6);
-  const [mood, setMood] = useState<string>(context?.mood || 'fatigued');
-  const [cognitiveLoad, setCognitiveLoad] = useState<number>(context?.cognitiveLoad || 7);
+  // 2. BODY & ENERGY
+  const [energyLevel, setEnergyLevel] = useState<number>(context?.energyLevel || 6);
+  const [fatigueLevel, setFatigueLevel] = useState<number>(context?.fatigueLevel || 4);
+  const [sorenessLevel, setSorenessLevel] = useState<number>(context?.sorenessLevel || 3);
 
-  // AVAILABILITY
-  const [availableMinutes, setAvailableMinutes] = useState<number>(context?.availableMinutes ?? 30);
+  // 3. MENTAL WELLBEING
+  const [stressLevel, setStressLevel] = useState<number>(context?.stressLevel || 4);
+  const [mood, setMood] = useState<string>(context?.mood || 'focused');
+  const [cognitiveLoad, setCognitiveLoad] = useState<number>(context?.cognitiveLoad || 5);
+
+  // 4. TODAY'S SCHEDULE & ENVIRONMENT
+  const [availableMinutes, setAvailableMinutes] = useState<number>(context?.availableMinutes ?? 35);
   const [preferredTime, setPreferredTime] = useState<'morning' | 'afternoon' | 'evening'>(
     context?.preferredTime || 'morning'
   );
-
-  // ENVIRONMENT
   const [environment, setEnvironment] = useState<'home' | 'gym' | 'outdoor' | 'other'>(
     (context?.environment as any) || 'home'
   );
-
-  // EQUIPMENT
   const [equipmentAvailable, setEquipmentAvailable] = useState<string[]>(
-    context?.equipmentAvailable || ['Dumbbells', 'Resistance bands', 'Mat']
+    context?.equipmentAvailable || ['Dumbbells', 'Mat', 'Resistance bands']
   );
 
-  // PREFERENCES
+  // 5. PREFERENCES
   const [activityPreference, setActivityPreference] = useState<string>(
-    context?.activityPreference || 'Mobility & Stretching'
+    context?.activityPreference || 'Mobility & Conditioning'
   );
   const [currentPreferences, setCurrentPreferences] = useState<string>(
-    context?.currentPreferences || 'Prefer gentle mobility and light tempo, feel tight from yesterday desk work'
+    context?.currentPreferences || ''
   );
-  const [hydrationLiters, setHydrationLiters] = useState<number>(context?.hydrationLiters || 1.2);
+  const [hydrationLiters, setHydrationLiters] = useState<number>(context?.hydrationLiters || 1.5);
 
-  // Feedback & Validation states
-  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  // UI state
   const [savedSuccess, setSavedSuccess] = useState<boolean>(false);
-  const [serverError, setServerError] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
-  // Synchronize when context loads or updates
   useEffect(() => {
     if (context) {
       setDate(context.date || new Date().toISOString().split('T')[0]);
       setSleepHours(context.sleepHours ?? 7);
-      setSleepQuality(context.sleepQuality ?? 5);
-      setEnergyLevel(context.energyLevel ?? 5);
-      setFatigueLevel(context.fatigueLevel ?? 5);
-      setSorenessLevel(context.sorenessLevel ?? 4);
-      setStressLevel(context.stressLevel ?? 5);
-      setMood(context.mood || 'good');
+      setSleepQuality(context.sleepQuality ?? 7);
+      setEnergyLevel(context.energyLevel ?? 6);
+      setFatigueLevel(context.fatigueLevel ?? 4);
+      setSorenessLevel(context.sorenessLevel ?? 3);
+      setStressLevel(context.stressLevel ?? 4);
+      setMood(context.mood || 'focused');
       setCognitiveLoad(context.cognitiveLoad ?? 5);
-      setAvailableMinutes(context.availableMinutes ?? 30);
+      setAvailableMinutes(context.availableMinutes ?? 35);
       setPreferredTime(context.preferredTime || 'morning');
       setEnvironment((context.environment as any) || 'home');
-      setEquipmentAvailable(context.equipmentAvailable || ['Mat', 'Dumbbells']);
-      setActivityPreference(context.activityPreference || 'Functional Strength');
+      setEquipmentAvailable(context.equipmentAvailable || ['Dumbbells', 'Mat', 'Resistance bands']);
+      setActivityPreference(context.activityPreference || 'Mobility & Conditioning');
       setCurrentPreferences(context.currentPreferences || '');
       setHydrationLiters(context.hydrationLiters ?? 1.5);
     }
   }, [context]);
 
-  // Real-time live estimate of recovery based on transparent formula
-  const liveRecoveryEstimate = useMemo(() => {
-    const sleep = Math.max(0, Math.min(24, Number(sleepHours) || 7));
-    const quality = Math.max(1, Math.min(10, Number(sleepQuality) || 5));
-    const energy = Math.max(1, Math.min(10, Number(energyLevel) || 5));
-    const fatigue = Math.max(1, Math.min(10, Number(fatigueLevel) || 5));
-    const stress = Math.max(1, Math.min(10, Number(stressLevel) || 5));
-    const soreness = Math.max(1, Math.min(10, Number(sorenessLevel) || 4));
+  // Live recovery estimation
+  const liveRecovery = useMemo(() => {
+    const sleep = Math.max(0, Math.min(14, Number(sleepHours) || 7));
+    const quality = Math.max(1, Math.min(10, Number(sleepQuality) || 7));
+    const energy = Math.max(1, Math.min(10, Number(energyLevel) || 6));
+    const fatigue = Math.max(1, Math.min(10, Number(fatigueLevel) || 4));
+    const stress = Math.max(1, Math.min(10, Number(stressLevel) || 4));
+    const soreness = Math.max(1, Math.min(10, Number(sorenessLevel) || 3));
 
     const sleepRatio = Math.min(100, (sleep / 8.0) * 100);
     const qualityMultiplier = 0.70 + (quality / 10) * 0.45;
@@ -126,72 +119,24 @@ export const MyContextView: React.FC = () => {
     const systemicPenalty = fatigue * 4.2 + stress * 3.4 + soreness * 2.4;
 
     const raw = Math.round(0.42 * effectiveRest + 0.38 * energyScore - 0.25 * systemicPenalty + 10);
-    const score = Math.max(12, Math.min(98, isNaN(raw) ? 50 : raw));
+    const score = Math.max(15, Math.min(98, isNaN(raw) ? 70 : raw));
 
-    let status: 'good' | 'moderate' | 'low' = 'moderate';
-    if (score >= 70) status = 'good';
-    else if (score < 48) status = 'low';
+    let status = 'Moderate';
+    if (score >= 75) status = 'Optimal';
+    else if (score < 50) status = 'Constrained';
 
     return { score, status };
   }, [sleepHours, sleepQuality, energyLevel, fatigueLevel, stressLevel, sorenessLevel]);
 
-  // Client-side validation function
-  const validateForm = (): boolean => {
-    const errors: Record<string, string> = {};
-
-    if (isNaN(sleepHours) || sleepHours <= 0 || sleepHours > 24) {
-      errors.sleepHours = 'Sleep duration must be between 0.5 and 24 hours.';
-    }
-
-    if (isNaN(availableMinutes) || availableMinutes < 0) {
-      errors.availableMinutes = 'Available time cannot be negative.';
-    } else if (availableMinutes > 480) {
-      errors.availableMinutes = 'Available time cannot exceed 480 minutes.';
-    }
-
-    if (energyLevel < 1 || energyLevel > 10) {
-      errors.energyLevel = 'Energy level must be between 1 and 10.';
-    }
-    if (fatigueLevel < 1 || fatigueLevel > 10) {
-      errors.fatigueLevel = 'Fatigue level must be between 1 and 10.';
-    }
-    if (stressLevel < 1 || stressLevel > 10) {
-      errors.stressLevel = 'Stress level must be between 1 and 10.';
-    }
-    if (sorenessLevel < 1 || sorenessLevel > 10) {
-      errors.sorenessLevel = 'Soreness level must be between 1 and 10.';
-    }
-    if (cognitiveLoad < 1 || cognitiveLoad > 10) {
-      errors.cognitiveLoad = 'Cognitive load must be between 1 and 10.';
-    }
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
   const handleToggleEquipment = (item: string) => {
-    if (item === 'No equipment') {
-      setEquipmentAvailable(prev =>
-        prev.includes('No equipment') ? [] : ['No equipment']
-      );
-      return;
-    }
-
-    setEquipmentAvailable(prev => {
-      const filtered = prev.filter(e => e !== 'No equipment');
-      return filtered.includes(item)
-        ? filtered.filter(e => e !== item)
-        : [...filtered, item];
-    });
+    setEquipmentAvailable(prev =>
+      prev.includes(item) ? prev.filter(e => e !== item) : [...prev, item]
+    );
   };
 
-  const handleSave = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    setServerError(null);
-
-    if (!validateForm()) {
-      return;
-    }
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavedSuccess(false);
 
     const payload: Partial<DailyContext> = {
       date,
@@ -199,729 +144,521 @@ export const MyContextView: React.FC = () => {
       sleepDuration: Number(sleepHours),
       sleepQuality: Number(sleepQuality),
       energyLevel: Number(energyLevel),
-      energy: Number(energyLevel),
       fatigueLevel: Number(fatigueLevel),
-      fatigue: Number(fatigueLevel),
-      stressLevel: Number(stressLevel),
-      stress: Number(stressLevel),
       sorenessLevel: Number(sorenessLevel),
-      soreness: Number(sorenessLevel),
-      recoveryScore: liveRecoveryEstimate.score,
-      recoveryStatus: liveRecoveryEstimate.status,
+      stressLevel: Number(stressLevel),
       mood,
       cognitiveLoad: Number(cognitiveLoad),
       availableMinutes: Number(availableMinutes),
       preferredTime,
       environment,
       equipmentAvailable,
-      equipment: equipmentAvailable,
       activityPreference,
       currentPreferences,
-      hydrationLiters: Number(hydrationLiters)
+      hydrationLiters: Number(hydrationLiters),
+      recoveryScore: liveRecovery.score
     };
 
-    const result = await updateContext(payload);
-    if (result.success) {
+    try {
+      await updateContext(payload);
       setSavedSuccess(true);
-      setValidationErrors({});
-      setTimeout(() => setSavedSuccess(false), 3500);
-    } else {
-      setServerError(result.error || 'Failed to save daily context.');
-      if (result.validationErrors) {
-        setValidationErrors(result.validationErrors);
-      }
+      setTimeout(() => setSavedSuccess(false), 4500);
+    } catch (err) {
+      console.error('Error saving context:', err);
     }
   };
 
-  // Quick preset scenarios for realistic simulation
-  const applyPreset = (preset: 'poor_sleep' | 'peak_energy' | 'gym_strength' | 'busy_travel') => {
-    if (preset === 'poor_sleep') {
-      setSleepHours(5.2);
-      setSleepQuality(4);
-      setEnergyLevel(4);
-      setFatigueLevel(8);
-      setSorenessLevel(7);
-      setStressLevel(7);
-      setMood('fatigued');
-      setCognitiveLoad(8);
-      setAvailableMinutes(25);
-      setPreferredTime('evening');
-      setEnvironment('home');
-      setActivityPreference('Mobility & Stretching');
-      setCurrentPreferences('Exhausted from late work shift, tight hamstrings & low back.');
-      setEquipmentAvailable(['Mat', 'Foam roller']);
-    } else if (preset === 'peak_energy') {
-      setSleepHours(8.0);
-      setSleepQuality(9);
-      setEnergyLevel(9);
-      setFatigueLevel(2);
-      setSorenessLevel(2);
-      setStressLevel(2);
-      setMood('great');
-      setCognitiveLoad(3);
-      setAvailableMinutes(60);
-      setPreferredTime('morning');
-      setEnvironment('outdoor');
-      setActivityPreference('Aerobic Cardio');
-      setCurrentPreferences('Feeling energized, ready for aerobic threshold or tempo run.');
-      setEquipmentAvailable(['Running shoes', 'Mat']);
-    } else if (preset === 'gym_strength') {
-      setSleepHours(7.4);
-      setSleepQuality(8);
-      setEnergyLevel(8);
-      setFatigueLevel(3);
-      setSorenessLevel(3);
-      setStressLevel(3);
-      setMood('good');
-      setCognitiveLoad(4);
-      setAvailableMinutes(50);
-      setPreferredTime('morning');
-      setEnvironment('gym');
-      setActivityPreference('Functional Strength');
-      setCurrentPreferences('Full gym access, scheduled progressive compound lifts.');
-      setEquipmentAvailable(['Dumbbells', 'Barbell & Rack', 'Treadmill', 'Mat']);
-    } else if (preset === 'busy_travel') {
-      setSleepHours(6.0);
-      setSleepQuality(5);
-      setEnergyLevel(5);
-      setFatigueLevel(6);
-      setSorenessLevel(4);
-      setStressLevel(6);
-      setMood('anxious');
-      setCognitiveLoad(7);
-      setAvailableMinutes(20);
-      setPreferredTime('afternoon');
-      setEnvironment('other');
-      setActivityPreference('Walking / Active Recovery');
-      setCurrentPreferences('Hotel room, no equipment, need quick restorative mental break.');
-      setEquipmentAvailable(['No equipment']);
-    }
-  };
-
-  const handleSelectHistoricalRecord = (record: DailyContext) => {
-    setDate(record.date);
-    setSleepHours(record.sleepHours);
-    setSleepQuality(record.sleepQuality || 6);
-    setEnergyLevel(record.energyLevel);
-    setFatigueLevel(record.fatigueLevel);
-    setSorenessLevel(record.sorenessLevel || 5);
-    setStressLevel(record.stressLevel);
-    setMood(record.mood || 'good');
-    setCognitiveLoad(record.cognitiveLoad || 5);
-    setAvailableMinutes(record.availableMinutes);
-    setPreferredTime(record.preferredTime || 'morning');
-    setEnvironment((record.environment as any) || 'home');
-    setEquipmentAvailable(record.equipmentAvailable || ['Mat']);
-    setActivityPreference(record.activityPreference || 'Functional Strength');
-    setCurrentPreferences(record.currentPreferences || '');
-    setHydrationLiters(record.hydrationLiters || 1.5);
-    setActiveTab('daily_state');
-    window.scrollTo({ top: 120, behavior: 'smooth' });
-  };
-
-  const equipmentOptions = [
-    'No equipment',
-    'Mat',
+  const allEquipmentOptions = [
     'Dumbbells',
     'Resistance bands',
-    'Treadmill',
+    'Mat',
     'Kettlebell',
-    'Foam roller',
     'Pull-up bar',
     'Barbell & Rack',
-    'Other'
-  ];
-
-  const activityTypes = [
-    'Functional Strength',
-    'Aerobic Cardio',
-    'Mobility & Stretching',
-    'HIIT',
-    'Walking / Active Recovery',
-    'Yoga'
-  ];
-
-  const moodOptions = [
-    { value: 'great', label: 'Great', color: 'text-emerald-400' },
-    { value: 'good', label: 'Good', color: 'text-teal-400' },
-    { value: 'neutral', label: 'Neutral', color: 'text-slate-300' },
-    { value: 'low', label: 'Low', color: 'text-amber-400' },
-    { value: 'anxious', label: 'Anxious', color: 'text-rose-400' },
-    { value: 'fatigued', label: 'Fatigued', color: 'text-purple-400' }
-  ];
-
-  const tabs: TabItem[] = [
-    { id: 'daily_state', label: 'Daily State', icon: Activity },
-    { id: 'availability', label: 'Availability & Environment', icon: Clock },
-    { id: 'preferences', label: 'Goals & Preferences', icon: Target },
-    { id: 'derived_state', label: 'Derived State & Trends', icon: Layers }
+    'Cardio Machine',
+    'Bodyweight only'
   ];
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      {/* 1. Header & Presets */}
-      <header className="border-b border-slate-800/80 pb-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-semibold uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <Sliders className="w-3.5 h-3.5 text-emerald-400" />
-                Adaptive Health Context
-              </span>
+    <div className="space-y-8 max-w-4xl mx-auto transition-colors duration-200">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+        <div>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--primary-soft)] text-[var(--primary)] text-xs font-semibold mb-2">
+            <Sliders className="w-3.5 h-3.5" />
+            <span>Daily Check-In</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)]">
+            How are you feeling today?
+          </h1>
+          <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-1.5 font-normal">
+            Update your sleep, body readiness, and schedule. HealthPilot will recalibrate your workout.
+          </p>
+        </div>
+
+        {/* Tab switch between Form and Trends */}
+        <div className="flex items-center p-1 bg-[var(--surface-soft)] rounded-2xl border border-[var(--border)] self-start sm:self-auto">
+          <button
+            onClick={() => setViewTab('checkin')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              viewTab === 'checkin'
+                ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            Today's Check-In
+          </button>
+          <button
+            onClick={() => setViewTab('trends')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              viewTab === 'trends'
+                ? 'bg-[var(--surface)] text-[var(--text-primary)] shadow-xs border border-[var(--border)]'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            Past Trends
+          </button>
+        </div>
+      </div>
+
+      {/* Success Notification Banner */}
+      {savedSuccess && (
+        <div className="p-4 rounded-2xl bg-[var(--primary-soft)] border border-[var(--primary)]/30 text-[var(--text-primary)] flex items-center justify-between gap-3 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-[var(--primary)] shrink-0" />
+            <div>
+              <p className="text-xs font-bold">Context saved successfully!</p>
+              <p className="text-xs text-[var(--text-secondary)]">Your workout recommendation and plan have been refreshed.</p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white">
-              My Health Context
-            </h1>
-            <p className="text-sm text-slate-400 mt-1">
-              Log your recovery markers, available time, and environment to dynamically steer today's plan.
-            </p>
           </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500 font-medium">Quick Presets:</span>
-            <button
-              type="button"
-              onClick={() => applyPreset('poor_sleep')}
-              className="text-xs font-medium px-2.5 py-1 rounded-lg bg-rose-500/10 text-rose-300 border border-rose-500/20 hover:bg-rose-500/20 transition-colors"
-            >
-              Sleep Deficit
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset('peak_energy')}
-              className="text-xs font-medium px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
-            >
-              Peak Energy
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset('gym_strength')}
-              className="text-xs font-medium px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 hover:bg-indigo-500/20 transition-colors"
-            >
-              Gym Day
-            </button>
-            <button
-              type="button"
-              onClick={() => applyPreset('busy_travel')}
-              className="text-xs font-medium px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
-            >
-              Busy / Travel
-            </button>
-          </div>
-        </div>
-      </header>
-
-      {/* D. CONTEXT SUMMARY BAR */}
-      <section className="p-4 bg-[#121215] border border-slate-800 rounded-xl flex flex-wrap items-center justify-between gap-4">
-        <div className="flex flex-wrap items-center gap-4 text-xs">
-          <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-medium">Date</span>
-            <span className="font-mono font-semibold text-slate-200">{date}</span>
-          </div>
-          <div className="h-6 w-px bg-slate-800" />
-          <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-medium">Live Recovery</span>
-            <span className={`font-mono font-bold ${
-              liveRecoveryEstimate.status === 'good' ? 'text-emerald-400' : liveRecoveryEstimate.status === 'low' ? 'text-rose-400' : 'text-amber-400'
-            }`}>
-              {liveRecoveryEstimate.score}% ({liveRecoveryEstimate.status})
-            </span>
-          </div>
-          <div className="h-6 w-px bg-slate-800" />
-          <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-medium">Sleep</span>
-            <span className="font-mono font-semibold text-slate-200">{Number(sleepHours || 0).toFixed(1)} hrs</span>
-          </div>
-          <div className="h-6 w-px bg-slate-800" />
-          <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-medium">Available</span>
-            <span className="font-mono font-semibold text-slate-200">{availableMinutes} min ({environment})</span>
-          </div>
-          <div className="h-6 w-px bg-slate-800" />
-          <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-medium">Water</span>
-            <span className="font-mono font-semibold text-cyan-400">{Number(hydrationLiters || 0).toFixed(2)} L</span>
-          </div>
-        </div>
-
-        <button
-          onClick={() => handleSave()}
-          disabled={isSavingContext}
-          className="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-[#0A0A0B] text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors disabled:opacity-50"
-        >
-          <Save className="w-3.5 h-3.5" />
-          <span>{isSavingContext ? 'Saving...' : 'Save & Update'}</span>
-        </button>
-      </section>
-
-      {/* TABS NAVIGATION */}
-      <Tabs
-        tabs={tabs}
-        activeTab={activeTab}
-        onChange={setActiveTab}
-        variant="pills"
-      />
-
-      {serverError && (
-        <div className="p-3.5 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-400 text-xs flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 shrink-0" />
-          <span>{serverError}</span>
+          <button
+            onClick={() => setActiveModule('today')}
+            className="px-4 py-1.5 rounded-xl bg-[var(--primary)] text-white text-xs font-bold hover:bg-[var(--primary-hover)] transition-colors shadow-xs"
+          >
+            View Today's Plan →
+          </button>
         </div>
       )}
 
-      {/* TAB CONTENT */}
-      <form onSubmit={handleSave} className="space-y-6">
-        {/* TAB 1: DAILY STATE (Physical, Recovery, Mental) */}
-        {activeTab === 'daily_state' && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Card 1: Sleep & Physical */}
-              <div className="p-5 bg-[#121215] border border-slate-800 rounded-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Moon className="w-4 h-4 text-indigo-400" />
-                    <span>Sleep & Physical Recovery</span>
-                  </h3>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
-                      className="p-1 rounded bg-slate-900 border border-slate-800 text-[11px] text-white focus:outline-emerald-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Sleep Duration */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <label className="font-semibold text-slate-300">Sleep Duration</label>
-                    <span className="font-mono font-bold text-indigo-400">{Number(sleepHours || 0).toFixed(1)} hrs</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="3.0"
-                    max="12.0"
-                    step="0.1"
-                    value={sleepHours}
-                    onChange={(e) => setSleepHours(Number(e.target.value))}
-                    className="w-full accent-indigo-500"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-500">
-                    <span>3.0h (Deficit)</span>
-                    <span>7.5h (Optimal)</span>
-                    <span>12.0h</span>
-                  </div>
-                </div>
-
-                {/* Sleep Quality */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <label className="font-semibold text-slate-300">Sleep Quality</label>
-                    <span className="font-mono font-bold text-slate-200">{sleepQuality} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={sleepQuality}
-                    onChange={(e) => setSleepQuality(Number(e.target.value))}
-                    className="w-full accent-indigo-500"
-                  />
-                </div>
-
-                {/* Energy Level */}
-                <div className="space-y-1.5 pt-1 border-t border-slate-800/80">
-                  <div className="flex justify-between text-xs">
-                    <label className="font-semibold text-slate-300 flex items-center gap-1">
-                      <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Energy Level</span>
-                    </label>
-                    <span className="font-mono font-bold text-amber-400">{energyLevel} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={energyLevel}
-                    onChange={(e) => setEnergyLevel(Number(e.target.value))}
-                    className="w-full accent-amber-500"
-                  />
-                </div>
-
-                {/* Fatigue Level */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <label className="font-semibold text-slate-300 flex items-center gap-1">
-                      <BatteryCharging className="w-3.5 h-3.5 text-rose-400" />
-                      <span>Fatigue Level</span>
-                    </label>
-                    <span className="font-mono font-bold text-rose-400">{fatigueLevel} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={fatigueLevel}
-                    onChange={(e) => setFatigueLevel(Number(e.target.value))}
-                    className="w-full accent-rose-500"
-                  />
-                </div>
-
-                {/* Muscle Soreness */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <label className="font-semibold text-slate-300 flex items-center gap-1">
-                      <Activity className="w-3.5 h-3.5 text-purple-400" />
-                      <span>Muscle Soreness (DOMS)</span>
-                    </label>
-                    <span className="font-mono font-bold text-purple-400">{sorenessLevel} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={sorenessLevel}
-                    onChange={(e) => setSorenessLevel(Number(e.target.value))}
-                    className="w-full accent-purple-500"
-                  />
-                </div>
+      {viewTab === 'trends' ? (
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 space-y-4">
+          <h3 className="text-lg font-bold text-[var(--text-primary)]">Recent Check-In History</h3>
+          <p className="text-xs text-[var(--text-muted)]">Recovery score, sleep duration, and energy levels over past sessions.</p>
+          <ContextHistoryChart history={contextHistory} />
+        </div>
+      ) : (
+        <form onSubmit={handleSave} className="space-y-6">
+          {/* Estimated Recovery Live Preview Card */}
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-center gap-3.5">
+              <div className="w-12 h-12 rounded-2xl bg-[var(--primary-soft)] border border-[var(--primary)]/30 flex items-center justify-center text-[var(--primary)] font-bold text-lg">
+                {liveRecovery.score}%
               </div>
-
-              {/* Card 2: Mental State & Hydration */}
-              <div className="p-5 bg-[#121215] border border-slate-800 rounded-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Brain className="w-4 h-4 text-emerald-400" />
-                    <span>Mental Workload & Hydration</span>
-                  </h3>
-                </div>
-
-                {/* Stress Level */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <label className="font-semibold text-slate-300 flex items-center gap-1">
-                      <Flame className="w-3.5 h-3.5 text-orange-400" />
-                      <span>Stress Level</span>
-                    </label>
-                    <span className="font-mono font-bold text-orange-400">{stressLevel} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={stressLevel}
-                    onChange={(e) => setStressLevel(Number(e.target.value))}
-                    className="w-full accent-orange-500"
-                  />
-                </div>
-
-                {/* Mood Selector */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-300 flex items-center gap-1">
-                    <Smile className="w-3.5 h-3.5 text-teal-400" />
-                    <span>Subjective Mood</span>
-                  </label>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    {moodOptions.map(m => (
-                      <button
-                        key={m.value}
-                        type="button"
-                        onClick={() => setMood(m.value)}
-                        className={`py-1.5 px-2 rounded-lg border font-medium text-center transition-all ${
-                          mood === m.value
-                            ? 'bg-slate-800 border-emerald-500/80 text-white shadow-2xs font-semibold'
-                            : 'border-slate-800 text-slate-400 hover:bg-slate-850'
-                        }`}
-                      >
-                        <span className={mood === m.value ? m.color : ''}>{m.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Cognitive Load */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs">
-                    <label className="font-semibold text-slate-300 flex items-center gap-1">
-                      <Brain className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Cognitive Workload</span>
-                    </label>
-                    <span className="font-mono font-bold text-indigo-400">{cognitiveLoad} / 10</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="1"
-                    max="10"
-                    value={cognitiveLoad}
-                    onChange={(e) => setCognitiveLoad(Number(e.target.value))}
-                    className="w-full accent-indigo-500"
-                  />
-                </div>
-
-                {/* Hydration Input */}
-                <div className="space-y-1.5 pt-2 border-t border-slate-800/80">
-                  <div className="flex justify-between text-xs">
-                    <label className="font-semibold text-slate-300 flex items-center gap-1">
-                      <Droplets className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Hydration Level</span>
-                    </label>
-                    <span className="font-mono font-bold text-cyan-400">{Number(hydrationLiters || 0).toFixed(2)} L</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="5.0"
-                    step="0.1"
-                    value={hydrationLiters}
-                    onChange={(e) => setHydrationLiters(Number(e.target.value))}
-                    className="w-full accent-cyan-500"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-500">
-                    <span>0.5L (Low)</span>
-                    <span>2.5L (Daily Target)</span>
-                    <span>5.0L</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: AVAILABILITY & ENVIRONMENT */}
-        {activeTab === 'availability' && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Schedule & Environment */}
-              <div className="p-5 bg-[#121215] border border-slate-800 rounded-xl space-y-4">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-2">
-                  <Clock className="w-4 h-4 text-teal-400" />
-                  <span>Time & Environment</span>
-                </h3>
-
-                {/* Available Time */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <label className="font-semibold text-slate-300">Available Time</label>
-                    <span className="font-mono font-bold text-teal-400">{availableMinutes} min</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="120"
-                    step="5"
-                    value={availableMinutes}
-                    onChange={(e) => setAvailableMinutes(Number(e.target.value))}
-                    className="w-full accent-teal-500"
-                  />
-                  <div className="flex justify-between text-[10px] text-slate-500">
-                    <span>0m (Rest Day)</span>
-                    <span>30m (Standard)</span>
-                    <span>120m</span>
-                  </div>
-                </div>
-
-                {/* Preferred Time */}
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-300">Preferred Time of Day</label>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
-                    {(['morning', 'afternoon', 'evening'] as const).map(time => (
-                      <button
-                        key={time}
-                        type="button"
-                        onClick={() => setPreferredTime(time)}
-                        className={`py-2 px-2 rounded-lg border font-semibold capitalize text-center transition-all ${
-                          preferredTime === time
-                            ? 'bg-teal-500/20 border-teal-500 text-teal-300'
-                            : 'border-slate-800 text-slate-400 hover:bg-slate-800/60'
-                        }`}
-                      >
-                        {time}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Environment */}
-                <div className="space-y-1.5 pt-1">
-                  <label className="block text-xs font-semibold text-slate-300 flex items-center gap-1">
-                    <Home className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Environment Setting</span>
-                  </label>
-                  <div className="grid grid-cols-4 gap-2 text-xs">
-                    {(['home', 'gym', 'outdoor', 'other'] as const).map(env => (
-                      <button
-                        key={env}
-                        type="button"
-                        onClick={() => setEnvironment(env)}
-                        className={`py-2 px-1 rounded-lg border font-semibold capitalize text-center transition-all ${
-                          environment === env
-                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                            : 'border-slate-800 text-slate-400 hover:bg-slate-800/60'
-                        }`}
-                      >
-                        {env}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Equipment Available */}
-              <div className="p-5 bg-[#121215] border border-slate-800 rounded-xl space-y-4">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-2">
-                  <Dumbbell className="w-4 h-4 text-emerald-400" />
-                  <span>Equipment on Hand ({equipmentAvailable.length} selected)</span>
-                </h3>
-
-                <p className="text-xs text-slate-400">
-                  HealthPilot filters recommended session exercises to only include equipment you currently have available.
+              <div>
+                <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block">Estimated Readiness</span>
+                <p className="text-base font-bold text-[var(--text-primary)]">
+                  {liveRecovery.status} Readiness
                 </p>
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Recalculates dynamically as you adjust your sleep, energy, and fatigue.
+                </p>
+              </div>
+            </div>
 
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {equipmentOptions.map(eq => {
-                    const isChecked = equipmentAvailable.includes(eq);
-                    return (
-                      <button
-                        key={eq}
-                        type="button"
-                        onClick={() => handleToggleEquipment(eq)}
-                        className={`text-xs px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
-                          isChecked
-                            ? 'bg-slate-800 border-slate-600 text-white font-medium'
-                            : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
-                        }`}
-                      >
-                        {isChecked && <Check className="w-3 h-3 text-emerald-400" />}
-                        <span>{eq}</span>
-                      </button>
-                    );
-                  })}
+            <button
+              type="submit"
+              disabled={isSavingContext}
+              className="px-6 py-3 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Save className="w-4 h-4" />
+              <span>{isSavingContext ? 'Saving...' : "Save Today's Context"}</span>
+            </button>
+          </div>
+
+          {/* 1. SLEEP */}
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 space-y-5">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-[var(--border)]">
+              <div className="w-8 h-8 rounded-xl bg-[var(--secondary-soft)] text-[var(--secondary)] flex items-center justify-center">
+                <Moon className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Sleep</h3>
+                <p className="text-xs text-[var(--text-muted)]">Your rest from last night</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Sleep Duration */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-[var(--text-primary)]">Sleep Duration</span>
+                  <span className="font-bold text-sm text-[var(--primary)]">{sleepHours} hours</span>
+                </div>
+                <input
+                  type="range"
+                  min={3}
+                  max={12}
+                  step={0.5}
+                  value={sleepHours}
+                  onChange={(e) => setSleepHours(Number(e.target.value))}
+                  className="w-full accent-[var(--primary)]"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)] font-medium">
+                  <span>3h (Short)</span>
+                  <span>7-8h (Recommended)</span>
+                  <span>12h</span>
+                </div>
+              </div>
+
+              {/* Sleep Quality */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-[var(--text-primary)]">Sleep Quality</span>
+                  <span className="font-bold text-sm text-[var(--primary)]">{sleepQuality} / 10</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  step={1}
+                  value={sleepQuality}
+                  onChange={(e) => setSleepQuality(Number(e.target.value))}
+                  className="w-full accent-[var(--primary)]"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)] font-medium">
+                  <span>Restless</span>
+                  <span>Moderate</span>
+                  <span>Deep & Restorative</span>
                 </div>
               </div>
             </div>
           </div>
-        )}
 
-        {/* TAB 3: GOALS & PREFERENCES */}
-        {activeTab === 'preferences' && (
-          <div className="space-y-6 animate-fade-in">
-            <div className="p-5 bg-[#121215] border border-slate-800 rounded-xl space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-2">
-                <Target className="w-4 h-4 text-emerald-400" />
-                <span>Activity & Workout Preferences</span>
-              </h3>
+          {/* 2. BODY & ENERGY */}
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 space-y-5">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-[var(--border)]">
+              <div className="w-8 h-8 rounded-xl bg-[var(--warning-soft)] text-[var(--warning)] flex items-center justify-center">
+                <Zap className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Body & Energy</h3>
+                <p className="text-xs text-[var(--text-muted)]">Your physical stamina and fatigue</p>
+              </div>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Preferred Workout Discipline
-                  </label>
-                  <select
-                    value={activityPreference}
-                    onChange={(e) => setActivityPreference(e.target.value)}
-                    className="w-full p-2.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-white focus:outline-emerald-500"
-                  >
-                    {activityTypes.map(type => (
-                      <option key={type} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-[11px] text-slate-500">
-                    HealthPilot will prefer this discipline unless acute fatigue or time constraints require an adaptive shift.
-                  </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {/* Energy Level */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-[var(--text-primary)]">Energy Level</span>
+                  <span className="font-bold text-sm text-[var(--warning)]">{energyLevel} / 10</span>
                 </div>
-
-                <div className="space-y-2">
-                  <label className="block text-xs font-semibold text-slate-300">
-                    Daily Context Notes / Freeform Request
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={currentPreferences}
-                    onChange={(e) => setCurrentPreferences(e.target.value)}
-                    placeholder="E.g., Feeling tight from yesterday desk work, prefer low-impact mobility over running today."
-                    className="w-full p-2.5 rounded-lg border border-slate-800 bg-slate-900 text-xs text-white placeholder:text-slate-500 focus:outline-emerald-500"
-                  />
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  value={energyLevel}
+                  onChange={(e) => setEnergyLevel(Number(e.target.value))}
+                  className="w-full accent-[var(--warning)]"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+                  <span>Drained</span>
+                  <span>Energetic</span>
                 </div>
               </div>
 
-              {/* Active Goals Summary */}
-              {goals && goals.length > 0 && (
-                <div className="pt-4 border-t border-slate-800/80 space-y-2">
-                  <span className="text-xs font-semibold text-slate-300 block">
-                    Active Goals Being Aligned
-                  </span>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {goals.filter(g => g.status === 'active').slice(0, 3).map(g => (
-                      <div key={g.id} className="p-3 bg-slate-900/60 rounded-lg border border-slate-800 text-xs space-y-1">
-                        <div className="font-semibold text-white truncate">{g.title}</div>
-                        <div className="text-[11px] text-slate-400 capitalize">{g.category} • Priority: {g.priority}</div>
-                      </div>
-                    ))}
-                  </div>
+              {/* Fatigue Level */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-[var(--text-primary)]">Fatigue Level</span>
+                  <span className="font-bold text-sm text-[var(--danger)]">{fatigueLevel} / 10</span>
                 </div>
-              )}
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  value={fatigueLevel}
+                  onChange={(e) => setFatigueLevel(Number(e.target.value))}
+                  className="w-full accent-[var(--danger)]"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+                  <span>Fresh</span>
+                  <span>Exhausted</span>
+                </div>
+              </div>
+
+              {/* Soreness Level */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-[var(--text-primary)]">Muscle Soreness</span>
+                  <span className="font-bold text-sm text-[var(--text-primary)]">{sorenessLevel} / 10</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  value={sorenessLevel}
+                  onChange={(e) => setSorenessLevel(Number(e.target.value))}
+                  className="w-full accent-[var(--primary)]"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+                  <span>None</span>
+                  <span>Noticeable</span>
+                </div>
+              </div>
             </div>
           </div>
-        )}
 
-        {/* TAB 4: DERIVED STATE & TRENDS */}
-        {activeTab === 'derived_state' && (
-          <div className="space-y-6 animate-fade-in">
-            {/* Today State Summary */}
-            {context && evolvingState && (
-              <TodayStateSummary
-                context={context}
-                evolvingState={evolvingState}
-                goals={goals}
-                onNavigateToModule={setActiveModule}
-              />
-            )}
+          {/* 3. MENTAL WELLBEING */}
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 space-y-5">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-[var(--border)]">
+              <div className="w-8 h-8 rounded-xl bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center">
+                <Brain className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Mental Wellbeing</h3>
+                <p className="text-xs text-[var(--text-muted)]">Stress, mood, and mental load</p>
+              </div>
+            </div>
 
-            {/* Context History & Trends */}
-            <ContextHistoryChart
-              history={contextHistory}
-              onSelectRecord={handleSelectHistoricalRecord}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {/* Stress Level */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-[var(--text-primary)]">Stress Level</span>
+                  <span className="font-bold text-sm text-[var(--text-primary)]">{stressLevel} / 10</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  value={stressLevel}
+                  onChange={(e) => setStressLevel(Number(e.target.value))}
+                  className="w-full accent-[var(--primary)]"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+                  <span>Calm</span>
+                  <span>High Stress</span>
+                </div>
+              </div>
+
+              {/* Mood */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[var(--text-primary)] block">
+                  Mood Today
+                </label>
+                <select
+                  value={mood}
+                  onChange={(e) => setMood(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+                >
+                  <option value="great">Great & Enthusiastic</option>
+                  <option value="focused">Focused & Grounded</option>
+                  <option value="good">Good / Normal</option>
+                  <option value="neutral">Neutral / Meh</option>
+                  <option value="fatigued">Fatigued / Low</option>
+                  <option value="stressed">Overwhelmed</option>
+                </select>
+              </div>
+
+              {/* Cognitive Load */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-[var(--text-primary)]">Cognitive Load</span>
+                  <span className="font-bold text-sm text-[var(--text-primary)]">{cognitiveLoad} / 10</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  value={cognitiveLoad}
+                  onChange={(e) => setCognitiveLoad(Number(e.target.value))}
+                  className="w-full accent-[var(--primary)]"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+                  <span>Clear Mind</span>
+                  <span>High Demands</span>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
 
-        {/* Action Bottom Bar */}
-        <div className="p-4 bg-[#121215] border border-slate-800 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            {savedSuccess ? (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-3 py-1.5 rounded-md border border-emerald-500/30">
-                <Check className="w-4 h-4 text-emerald-400" />
-                <span>Daily context record saved & evolving state recalculated!</span>
-              </span>
-            ) : (
-              <span className="text-xs text-slate-400">
-                Changes are immediately re-evaluated by the Decision Engine.
-              </span>
-            )}
+          {/* 4. TODAY'S SCHEDULE & ENVIRONMENT */}
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 space-y-5">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-[var(--border)]">
+              <div className="w-8 h-8 rounded-xl bg-[var(--secondary-soft)] text-[var(--secondary)] flex items-center justify-center">
+                <Clock className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Today's Schedule</h3>
+                <p className="text-xs text-[var(--text-muted)]">Time, location, and equipment</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              {/* Available Time */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-semibold text-[var(--text-primary)]">Available Time</span>
+                  <span className="font-bold text-sm text-[var(--primary)]">{availableMinutes} min</span>
+                </div>
+                <input
+                  type="range"
+                  min={10}
+                  max={90}
+                  step={5}
+                  value={availableMinutes}
+                  onChange={(e) => setAvailableMinutes(Number(e.target.value))}
+                  className="w-full accent-[var(--primary)]"
+                />
+                <div className="flex justify-between text-[10px] text-[var(--text-muted)]">
+                  <span>10m</span>
+                  <span>30m</span>
+                  <span>60m+</span>
+                </div>
+              </div>
+
+              {/* Preferred Time */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[var(--text-primary)] block">
+                  Preferred Time of Day
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['morning', 'afternoon', 'evening'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setPreferredTime(t)}
+                      className={`py-2 rounded-xl text-xs font-semibold capitalize transition-all ${
+                        preferredTime === t
+                          ? 'bg-[var(--primary)] text-white shadow-xs'
+                          : 'bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--border)]'
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Environment */}
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[var(--text-primary)] block">
+                  Environment
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['home', 'gym', 'outdoor'] as const).map(env => (
+                    <button
+                      key={env}
+                      type="button"
+                      onClick={() => setEnvironment(env)}
+                      className={`py-2 rounded-xl text-xs font-semibold capitalize transition-all ${
+                        environment === env
+                          ? 'bg-[var(--primary)] text-white shadow-xs'
+                          : 'bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--border)]'
+                      }`}
+                    >
+                      {env}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Equipment Checkboxes */}
+            <div className="space-y-2.5 pt-2">
+              <label className="text-xs font-semibold text-[var(--text-primary)] block">
+                Equipment Available Today
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {allEquipmentOptions.map(eq => {
+                  const isChecked = equipmentAvailable.includes(eq);
+                  return (
+                    <button
+                      key={eq}
+                      type="button"
+                      onClick={() => handleToggleEquipment(eq)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
+                        isChecked
+                          ? 'bg-[var(--primary-soft)] text-[var(--primary)] border border-[var(--primary)]/30 font-semibold'
+                          : 'bg-[var(--surface-soft)] text-[var(--text-secondary)] border border-[var(--border)]'
+                      }`}
+                    >
+                      <Check className={`w-3 h-3 ${isChecked ? 'opacity-100' : 'opacity-0'}`} />
+                      <span>{eq}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2.5 self-end sm:self-auto">
+          {/* 5. PREFERENCES */}
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 space-y-5">
+            <div className="flex items-center gap-2.5 pb-2 border-b border-[var(--border)]">
+              <div className="w-8 h-8 rounded-xl bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center">
+                <Heart className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[var(--text-primary)]">Preferences</h3>
+                <p className="text-xs text-[var(--text-muted)]">Activity style and personal notes for today</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[var(--text-primary)] block">
+                  Preferred Activity Type
+                </label>
+                <select
+                  value={activityPreference}
+                  onChange={(e) => setActivityPreference(e.target.value)}
+                  className="w-full p-2.5 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] text-xs text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+                >
+                  <option value="Mobility & Conditioning">Mobility & Gentle Conditioning</option>
+                  <option value="Functional Strength">Functional Strength</option>
+                  <option value="Zone 2 Aerobic">Zone 2 Aerobic / Cardio</option>
+                  <option value="HIIT / Intervals">HIIT / Express Intervals</option>
+                  <option value="Recovery Yoga & Breathwork">Recovery Yoga & Breathwork</option>
+                  <option value="Outdoor Brisk Walk">Outdoor Brisk Walk</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[var(--text-primary)] block">
+                  Notes for HealthPilot Coach (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={currentPreferences}
+                  onChange={(e) => setCurrentPreferences(e.target.value)}
+                  placeholder="e.g. Mild lower back tightness, prefer low impact"
+                  className="w-full p-2.5 rounded-xl bg-[var(--surface-soft)] border border-[var(--border)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Submit Button */}
+          <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
               onClick={() => setActiveModule('today')}
-              className="px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition-colors"
+              className="px-5 py-2.5 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
             >
-              Back to Today
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isSavingContext}
-              className="px-5 py-2.5 rounded-lg text-xs font-bold text-[#0A0A0B] bg-emerald-500 hover:bg-emerald-400 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+              className="px-7 py-3 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold transition-all shadow-md flex items-center gap-2 disabled:opacity-50 cursor-pointer"
             >
               <Save className="w-4 h-4" />
-              <span>{isSavingContext ? 'Saving...' : 'Save Context'}</span>
+              <span>{isSavingContext ? 'Saving...' : "Save Today's Context"}</span>
             </button>
           </div>
-        </div>
-      </form>
+        </form>
+      )}
     </div>
   );
 };

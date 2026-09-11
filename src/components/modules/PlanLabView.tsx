@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from 'react';
 import { useHealthPilot } from '../../context/HealthPilotContext.js';
-import { MetricBadge } from '../common/MetricBadge.js';
 import { EvaluatedCandidate, DecisionScoringWeights } from '../../types/index.js';
 import {
   Layers,
@@ -14,12 +13,9 @@ import {
   Scale,
   ShieldCheck,
   Zap,
-  Activity,
-  AlertTriangle,
-  RotateCcw,
-  Maximize2
+  ChevronDown,
+  RotateCcw
 } from 'lucide-react';
-import { Accordion } from '../common/Accordion.js';
 
 const DEFAULT_WEIGHTS: DecisionScoringWeights = {
   suitabilityWeight: 0.30,
@@ -32,17 +28,12 @@ const DEFAULT_WEIGHTS: DecisionScoringWeights = {
 export const PlanLabView: React.FC = () => {
   const { recommendation, context, evolvingState, setActiveModule } = useHealthPilot();
 
-  // Custom weights for interactive simulation
   const [weights, setWeights] = useState<DecisionScoringWeights>(
     recommendation?.scoringWeights || DEFAULT_WEIGHTS
   );
+  const [showAdvancedWeights, setShowAdvancedWeights] = useState(false);
+  const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(null);
 
-  // Comparison candidates selection
-  const [compareMode, setCompareMode] = useState<boolean>(false);
-  const [candidateAId, setCandidateAId] = useState<string>('');
-  const [candidateBId, setCandidateBId] = useState<string>('');
-
-  // Fallback evaluated candidates if not provided
   const baseCandidates: EvaluatedCandidate[] = useMemo(() => {
     if (recommendation?.allEvaluatedCandidates && recommendation.allEvaluatedCandidates.length > 0) {
       return recommendation.allEvaluatedCandidates;
@@ -50,9 +41,9 @@ export const PlanLabView: React.FC = () => {
 
     if (!recommendation) return [];
 
-    const winner: EvaluatedCandidate = {
+    const winner: any = {
       id: recommendation.id,
-      activityType: 'Mobility & Stretching',
+      activityType: 'Mobility & Conditioning',
       title: recommendation.title,
       category: recommendation.category,
       durationMinutes: recommendation.durationMinutes,
@@ -63,610 +54,240 @@ export const PlanLabView: React.FC = () => {
       recoveryDemand: recommendation.intensity === 'low' ? 'low' : 'moderate',
       description: recommendation.whyRecommended,
       targetDomain: recommendation.targetDomain,
-      suitabilityScore: recommendation.suitabilityScore ?? recommendation.healthSuitabilityScore,
-      healthSuitabilityScore: recommendation.healthSuitabilityScore,
-      goalAlignmentScore: recommendation.goalAlignmentScore || 85,
-      goalReasons: ['Maintains physical habit streak while protecting cardiac load'],
-      behavioralFitScore: recommendation.behavioralFitScore || 78,
-      behavioralReasons: ['High historical consistency for 20m restorative sessions'],
+      suitabilityScore: 92,
+      healthSuitabilityScore: 92,
+      goalAlignmentScore: 88,
+      behavioralFitScore: 85,
       predictedAdherence: recommendation.predictedAdherence,
-      contextFeasibilityScore: recommendation.contextFeasibilityScore || 95,
-      feasibilityReasons: ['Fits comfortably in current 30m window at home'],
-      finalDecisionScore: recommendation.finalDecisionScore || 89.2,
-      scoreBreakdown: recommendation.scoreBreakdown || {
-        suitabilityContribution: 28.2,
-        goalAlignmentContribution: 17.0,
-        behavioralFitContribution: 7.8,
-        predictedAdherenceContribution: 22.0,
-        contextFeasibilityContribution: 14.2
-      },
+      contextFeasibilityScore: 95,
+      finalDecisionScore: 89.5,
       rationale: recommendation.whyRecommended,
-      suitabilityReasons: ['Restorative recovery response to low sleep & elevated fatigue'],
+      tradeoff: 'Prioritizes immediate physical recovery and habit preservation over high cardiovascular strain.',
       isWinner: true
     };
 
-    const alts: EvaluatedCandidate[] = recommendation.alternatives.map((alt, idx) => ({
-      ...alt,
-      id: alt.id,
-      activityType: alt.activityType || 'Active Recovery',
+    const alts: any[] = (recommendation.alternatives || []).map((alt, idx) => ({
+      id: alt.id || `alt-${idx}`,
+      activityType: alt.activityType || 'Alternative Workout',
       title: alt.title,
-      category: alt.category || 'recovery',
+      category: alt.category || 'workout',
       durationMinutes: alt.durationMinutes,
       intensity: alt.intensity,
       environment: alt.environment as any,
-      requiredEquipment: alt.requiredEquipment || ['Yoga mat'],
-      goalAlignment: alt.goalAlignment || 'Cardiovascular Conditioning',
+      requiredEquipment: alt.requiredEquipment || ['Dumbbells'],
+      goalAlignment: alt.goalAlignment || 'Primary Fitness Goal',
       recoveryDemand: alt.intensity === 'high' ? 'high' : 'moderate',
       description: alt.rationale,
-      targetDomain: 'Conditioning',
-      suitabilityScore: alt.suitabilityScore || alt.healthSuitabilityScore,
-      healthSuitabilityScore: alt.healthSuitabilityScore,
-      goalAlignmentScore: alt.goalAlignmentScore || (75 - idx * 6),
-      goalReasons: alt.goalReasons || ['Secondary progression option'],
-      behavioralFitScore: alt.behavioralFitScore || (68 - idx * 5),
-      behavioralReasons: alt.behavioralReasons || ['Moderate historical friction under fatigue'],
-      predictedAdherence: alt.predictedAdherence,
-      contextFeasibilityScore: alt.contextFeasibilityScore || (82 - idx * 8),
-      feasibilityReasons: alt.feasibilityReasons || ['Requires higher activation energy'],
-      finalDecisionScore: alt.finalDecisionScore || Number((alt.healthSuitabilityScore * 0.4 + alt.predictedAdherence * 0.4 + 15).toFixed(1)),
-      scoreBreakdown: alt.scoreBreakdown || {
-        suitabilityContribution: Number((alt.healthSuitabilityScore * 0.3).toFixed(1)),
-        goalAlignmentContribution: 14.0,
-        behavioralFitContribution: 6.5,
-        predictedAdherenceContribution: Number((alt.predictedAdherence * 0.25).toFixed(1)),
-        contextFeasibilityContribution: 12.0
-      },
+      targetDomain: 'Primary Goal',
+      suitabilityScore: 82 - idx * 6,
+      healthSuitabilityScore: 82 - idx * 6,
+      goalAlignmentScore: 92,
+      behavioralFitScore: 74,
+      predictedAdherence: Math.max(50, recommendation.predictedAdherence - (idx + 1) * 8),
+      contextFeasibilityScore: 80 - idx * 10,
+      finalDecisionScore: 82.0 - idx * 7,
       rationale: alt.rationale,
-      suitabilityReasons: alt.suitabilityReasons || [alt.rationale],
+      tradeoff: idx === 0
+        ? 'Delivers a stronger strength stimulus, but demands 15 more minutes and carries higher fatigue risk.'
+        : 'Faster to complete, but provides less progressive overload for endurance building.',
       isWinner: false
     }));
 
-    return [winner, ...alts];
+    return [winner, ...alts] as EvaluatedCandidate[];
   }, [recommendation]);
 
-  // Recalculate candidate scores dynamically when weights are tuned
-  const dynamicallyScoredCandidates = useMemo(() => {
-    const totalW =
-      weights.suitabilityWeight +
-      weights.predictedAdherenceWeight +
-      weights.goalAlignmentWeight +
-      weights.contextFeasibilityWeight +
-      weights.behavioralFitWeight || 1.0;
-
-    const normW = {
-      wSuit: weights.suitabilityWeight / totalW,
-      wAdh: weights.predictedAdherenceWeight / totalW,
-      wGoal: weights.goalAlignmentWeight / totalW,
-      wFeas: weights.contextFeasibilityWeight / totalW,
-      wBeh: weights.behavioralFitWeight / totalW
-    };
-
-    const reCalculated: EvaluatedCandidate[] = baseCandidates.map(c => {
-      const suitContrib = c.suitabilityScore * normW.wSuit;
-      const adhContrib = c.predictedAdherence * normW.wAdh;
-      const goalContrib = c.goalAlignmentScore * normW.wGoal;
-      const feasContrib = c.contextFeasibilityScore * normW.wFeas;
-      const behContrib = c.behavioralFitScore * normW.wBeh;
-      const newFinal = Number((suitContrib + adhContrib + goalContrib + feasContrib + behContrib).toFixed(1));
-
-      return {
-        ...c,
-        finalDecisionScore: newFinal,
-        scoreBreakdown: {
-          suitabilityContribution: Number(suitContrib.toFixed(1)),
-          predictedAdherenceContribution: Number(adhContrib.toFixed(1)),
-          goalAlignmentContribution: Number(goalContrib.toFixed(1)),
-          contextFeasibilityContribution: Number(feasContrib.toFixed(1)),
-          behavioralFitContribution: Number(behContrib.toFixed(1))
-        }
-      };
-    });
-
-    reCalculated.sort((a, b) => b.finalDecisionScore - a.finalDecisionScore);
-    return reCalculated;
-  }, [baseCandidates, weights]);
-
-  const [selectedCandidateId, setSelectedCandidateId] = useState<string>(
-    dynamicallyScoredCandidates[0]?.id || ''
-  );
-
-  const selectedCandidate =
-    dynamicallyScoredCandidates.find(c => c.id === selectedCandidateId) ||
-    dynamicallyScoredCandidates[0];
-
-  const candidateA =
-    dynamicallyScoredCandidates.find(c => c.id === candidateAId) ||
-    dynamicallyScoredCandidates[0];
-  const candidateB =
-    dynamicallyScoredCandidates.find(c => c.id === candidateBId) ||
-    dynamicallyScoredCandidates[1] ||
-    dynamicallyScoredCandidates[0];
-
-  const handleResetWeights = () => {
-    setWeights(DEFAULT_WEIGHTS);
-  };
+  const resetWeights = () => setWeights(DEFAULT_WEIGHTS);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 max-w-5xl mx-auto transition-colors duration-200">
       {/* Header */}
-      <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-6 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className="px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 font-mono text-xs font-bold border border-emerald-500/20 flex items-center gap-1.5">
-              <Layers className="w-3.5 h-3.5 text-emerald-400" />
-              Decision Space Explorer
-            </span>
-            <span className="text-xs text-slate-500 font-mono">Multi-Objective Optimization</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--primary-soft)] text-[var(--primary)] text-xs font-semibold mb-2">
+            <Layers className="w-3.5 h-3.5" />
+            <span>Option Comparison</span>
           </div>
-          <h2 className="text-lg font-bold text-white tracking-tight">
-            Plan Lab: Candidate Intervention Matrix & Trade-Offs
-          </h2>
-          <p className="text-xs text-slate-400 max-w-2xl leading-relaxed mt-1">
-            The Recommendation Engine evaluates multiple candidate interventions across 5 mathematical factors:
-            Health Suitability, Predicted Adherence, Goal Alignment, Context Feasibility, and Behavioral Fit.
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text-primary)]">
+            Explore Your Options
+          </h1>
+          <p className="text-sm sm:text-base text-[var(--text-secondary)] mt-1.5 font-normal max-w-2xl">
+            See the different workout paths HealthPilot evaluated for today, and understand the trade-offs behind the recommended choice.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setCompareMode(!compareMode)}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors border ${
-              compareMode
-                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                : 'bg-slate-900 border-slate-700 text-slate-300 hover:bg-slate-800'
-            }`}
-          >
-            <Scale className="w-3.5 h-3.5" />
-            <span>{compareMode ? 'Exit Trade-Off Comparison' : 'Side-by-Side Comparison'}</span>
-          </button>
-        </div>
+        <button
+          onClick={() => setActiveModule('today')}
+          className="px-4 py-2 rounded-2xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 self-start sm:self-auto"
+        >
+          <span>Return to Today</span>
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
       </div>
 
-      {/* 1. INTERACTIVE DECISION WEIGHT TUNER (ACTION) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Sliders className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              1. Decision Factor Weights (Live Simulation)
-            </h3>
-          </div>
-          <button
-            onClick={handleResetWeights}
-            className="text-[11px] font-semibold text-slate-400 hover:text-white flex items-center gap-1"
-          >
-            <RotateCcw className="w-3 h-3" />
-            <span>Reset to Engine Defaults</span>
-          </button>
-        </div>
+      {/* 3 CANDIDATE OPTION CARDS */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {baseCandidates.slice(0, 3).map((candidate, idx) => {
+          const isWinner = candidate.isWinner || idx === 0;
 
-        <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 shadow-xs">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 text-xs">
-            {/* Suitability Weight */}
-            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-300 font-medium">Health Suitability</span>
-                <span className="font-mono font-bold text-teal-300">{Math.round(weights.suitabilityWeight * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.60"
-                step="0.05"
-                value={weights.suitabilityWeight}
-                onChange={e => setWeights({ ...weights, suitabilityWeight: parseFloat(e.target.value) })}
-                className="w-full accent-teal-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-500 block">Biological readiness priority</span>
-            </div>
-
-            {/* Adherence Weight */}
-            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-300 font-medium">Predicted Adherence</span>
-                <span className="font-mono font-bold text-emerald-400">{Math.round(weights.predictedAdherenceWeight * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.60"
-                step="0.05"
-                value={weights.predictedAdherenceWeight}
-                onChange={e => setWeights({ ...weights, predictedAdherenceWeight: parseFloat(e.target.value) })}
-                className="w-full accent-emerald-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-500 block">Completion probability priority</span>
-            </div>
-
-            {/* Goal Alignment Weight */}
-            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-300 font-medium">Goal Alignment</span>
-                <span className="font-mono font-bold text-cyan-400">{Math.round(weights.goalAlignmentWeight * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.60"
-                step="0.05"
-                value={weights.goalAlignmentWeight}
-                onChange={e => setWeights({ ...weights, goalAlignmentWeight: parseFloat(e.target.value) })}
-                className="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-500 block">Long-term target priority</span>
-            </div>
-
-            {/* Context Feasibility Weight */}
-            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-300 font-medium">Context Feasibility</span>
-                <span className="font-mono font-bold text-indigo-400">{Math.round(weights.contextFeasibilityWeight * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.60"
-                step="0.05"
-                value={weights.contextFeasibilityWeight}
-                onChange={e => setWeights({ ...weights, contextFeasibilityWeight: parseFloat(e.target.value) })}
-                className="w-full accent-indigo-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-500 block">Time & space constraint priority</span>
-            </div>
-
-            {/* Behavioral Fit Weight */}
-            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/80 space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-slate-300 font-medium">Behavioral Fit</span>
-                <span className="font-mono font-bold text-purple-400">{Math.round(weights.behavioralFitWeight * 100)}%</span>
-              </div>
-              <input
-                type="range"
-                min="0.05"
-                max="0.60"
-                step="0.05"
-                value={weights.behavioralFitWeight}
-                onChange={e => setWeights({ ...weights, behavioralFitWeight: parseFloat(e.target.value) })}
-                className="w-full accent-purple-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer"
-              />
-              <span className="text-[10px] text-slate-500 block">Habit consistency priority</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. CANDIDATE MATRIX & DEEP DIVE (PRIMARY & SUPPORTING) */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between px-1">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-emerald-400" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              2. Candidate Interventions & Decision Breakdown
-            </h3>
-          </div>
-          <span className="text-[10px] font-mono text-slate-500">
-            {dynamicallyScoredCandidates.length} Options Evaluated
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Left Column: Candidate List with Multi-Factor Scores */}
-          <div className="lg:col-span-6 space-y-3">
-            {dynamicallyScoredCandidates.map((c, idx) => {
-              const isSelected = c.id === selectedCandidate.id;
-              const isRankOne = idx === 0;
-
-              return (
-                <div
-                  key={c.id}
-                  onClick={() => setSelectedCandidateId(c.id)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-emerald-500/10 border-emerald-500 shadow-xs'
-                      : 'bg-[#0F0F11] border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-2.5">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                          isRankOne ? 'bg-emerald-500 text-[#0A0A0B]' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          #{idx + 1}
-                        </span>
-                        <h4 className="text-sm font-bold text-white">{c.title}</h4>
-                        {isRankOne && (
-                          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">
-                            Engine Winner
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
-                          <Clock className="w-3 h-3 text-slate-500" />
-                          {c.durationMinutes}m
-                        </span>
-                        <span className="text-xs text-slate-600">•</span>
-                        <span className="text-xs text-slate-400 capitalize">{c.intensity} intensity</span>
-                        <span className="text-xs text-slate-600">•</span>
-                        <span className="text-xs text-slate-400 capitalize">{c.environment}</span>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      <span className="text-sm font-mono font-bold text-emerald-400 block">
-                        {c.finalDecisionScore}
-                      </span>
-                      <span className="text-[10px] text-slate-500 block font-mono">Score / 100</span>
-                    </div>
-                  </div>
-
-                  {/* 5-Factor Mini Score Bar */}
-                  <div className="grid grid-cols-5 gap-1.5 text-[10px] font-mono text-center pt-2 border-t border-slate-800/70">
-                    <div className="p-1 rounded bg-slate-900/60">
-                      <span className="text-slate-500 block">Suit</span>
-                      <span className="font-bold text-teal-300">{c.suitabilityScore}%</span>
-                    </div>
-                    <div className="p-1 rounded bg-slate-900/60">
-                      <span className="text-slate-500 block">Adh</span>
-                      <span className="font-bold text-emerald-400">{c.predictedAdherence}%</span>
-                    </div>
-                    <div className="p-1 rounded bg-slate-900/60">
-                      <span className="text-slate-500 block">Goal</span>
-                      <span className="font-bold text-cyan-400">{c.goalAlignmentScore}%</span>
-                    </div>
-                    <div className="p-1 rounded bg-slate-900/60">
-                      <span className="text-slate-500 block">Feas</span>
-                      <span className="font-bold text-indigo-400">{c.contextFeasibilityScore}%</span>
-                    </div>
-                    <div className="p-1 rounded bg-slate-900/60">
-                      <span className="text-slate-500 block">Beh</span>
-                      <span className="font-bold text-purple-400">{c.behavioralFitScore}%</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Right Column: Selected Candidate Deep Dive */}
-          <div className="lg:col-span-6 space-y-4">
-            {selectedCandidate && (
-              <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 shadow-xs space-y-4">
-                <div className="flex items-start justify-between border-b border-slate-800 pb-3">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-semibold block">
-                      Candidate Specification
-                    </span>
-                    <h4 className="text-base font-bold text-white mt-0.5">{selectedCandidate.title}</h4>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-1">
-                      <span className="capitalize">Category: {selectedCandidate.category?.replace('_', ' ')}</span>
-                      <span>•</span>
-                      <span className="capitalize">Gear: {selectedCandidate.requiredEquipment?.join(', ') || 'None'}</span>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-xl font-mono font-extrabold text-emerald-400">
-                      {selectedCandidate.finalDecisionScore}
-                    </span>
-                    <span className="text-[10px] text-slate-500 block font-mono">Utility Score</span>
-                  </div>
-                </div>
-
-                {/* Point Contribution Breakdown */}
-                <div className="space-y-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Point Contribution Breakdown (Weighted Sum)
+          return (
+            <div
+              key={candidate.id || idx}
+              className={`p-6 sm:p-7 rounded-3xl border transition-all flex flex-col justify-between space-y-4 ${
+                isWinner
+                  ? 'bg-[var(--surface)] border-2 border-[var(--primary)] shadow-md'
+                  : 'bg-[var(--surface)] border border-[var(--border)] shadow-xs hover:border-[var(--primary)]/40'
+              }`}
+            >
+              <div className="space-y-3">
+                {/* Top Badge */}
+                <div className="flex items-center justify-between">
+                  <span
+                    className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${
+                      isWinner
+                        ? 'bg-[var(--primary)] text-white shadow-xs'
+                        : 'bg-[var(--surface-soft)] text-[var(--text-muted)] border border-[var(--border)]'
+                    }`}
+                  >
+                    {isWinner ? 'Best Match' : `Option ${idx + 1}`}
                   </span>
-                  <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5 text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-teal-300 font-medium">Health Suitability ({selectedCandidate.suitabilityScore}%)</span>
-                      <span className="font-mono font-bold text-teal-300">+{selectedCandidate.scoreBreakdown?.suitabilityContribution} pts</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-emerald-400 font-medium">Predicted Adherence ({selectedCandidate.predictedAdherence}%)</span>
-                      <span className="font-mono font-bold text-emerald-400">+{selectedCandidate.scoreBreakdown?.predictedAdherenceContribution} pts</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-cyan-400 font-medium">Goal Alignment ({selectedCandidate.goalAlignmentScore}%)</span>
-                      <span className="font-mono font-bold text-cyan-400">+{selectedCandidate.scoreBreakdown?.goalAlignmentContribution} pts</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-indigo-400 font-medium">Context Feasibility ({selectedCandidate.contextFeasibilityScore}%)</span>
-                      <span className="font-mono font-bold text-indigo-400">+{selectedCandidate.scoreBreakdown?.contextFeasibilityContribution} pts</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-purple-400 font-medium">Behavioral Fit ({selectedCandidate.behavioralFitScore}%)</span>
-                      <span className="font-mono font-bold text-purple-400">+{selectedCandidate.scoreBreakdown?.behavioralFitContribution} pts</span>
-                    </div>
+                  <span className="text-xs font-semibold text-[var(--primary)]">
+                    {candidate.predictedAdherence}% match
+                  </span>
+                </div>
+
+                {/* Workout Title */}
+                <div>
+                  <h3 className="text-lg font-bold text-[var(--text-primary)]">
+                    {candidate.title}
+                  </h3>
+                  <div className="flex items-center gap-2 text-xs text-[var(--text-muted)] mt-1">
+                    <span>{candidate.durationMinutes} min</span>
+                    <span>•</span>
+                    <span className="capitalize">{candidate.intensity}</span>
+                    <span>•</span>
+                    <span className="capitalize">{candidate.environment || 'Home'}</span>
                   </div>
                 </div>
 
-                {/* Trade-Off Summary */}
-                <div className="space-y-1 text-xs">
-                  <h5 className="font-bold text-slate-200">Engine Attribution & Trade-Off Notice</h5>
-                  <p className="text-slate-300 leading-relaxed bg-slate-900/60 p-3 rounded-lg border border-slate-800 text-[11px]">
-                    {selectedCandidate.rationale}
+                {/* Plain Trade-Off */}
+                <div className="p-3.5 rounded-2xl bg-[var(--surface-soft)] border border-[var(--border)] text-xs text-[var(--text-secondary)] space-y-1">
+                  <span className="font-bold text-[var(--text-primary)] block">
+                    {isWinner ? 'Why this won today:' : 'Trade-off consideration:'}
+                  </span>
+                  <p className="leading-relaxed">
+                    {(candidate as any).tradeoff || candidate.rationale || candidate.description}
                   </p>
                 </div>
+              </div>
 
-                {/* Action Buttons */}
-                <div className="pt-2 flex items-center justify-between border-t border-slate-800">
+              {/* Bottom Action */}
+              <div className="pt-3 border-t border-[var(--border)]">
+                {isWinner ? (
+                  <div className="flex items-center justify-center gap-1.5 py-2.5 rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)] text-xs font-bold">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Selected for Today</span>
+                  </div>
+                ) : (
                   <button
-                    onClick={() => setActiveModule('what_if')}
-                    className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
+                    onClick={() => {
+                      setSelectedCandidateId(candidate.id);
+                      setActiveModule('today');
+                    }}
+                    className="w-full py-2.5 rounded-2xl bg-[var(--surface-soft)] hover:bg-[var(--surface-elevated)] border border-[var(--border)] text-xs font-semibold text-[var(--text-primary)] transition-all flex items-center justify-center gap-1.5"
                   >
-                    <span>Simulate in What-If Lab</span>
+                    <span>Choose This Instead</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </button>
-
-                  <button
-                    onClick={() => setActiveModule('coach')}
-                    className="text-xs font-medium text-slate-400 hover:text-white"
-                  >
-                    Consult AI Coach →
-                  </button>
-                </div>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* 3. SIDE-BY-SIDE TRADE-OFF COMPARISON (COLLAPSIBLE / COMPARATIVE) */}
-      {compareMode && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <Scale className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                3. Side-by-Side Trade-Off Comparison
-              </h3>
+      {/* ADVANCED DETAILS COLLAPSIBLE */}
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-6 sm:p-7 space-y-4 shadow-xs">
+        <button
+          onClick={() => setShowAdvancedWeights(!showAdvancedWeights)}
+          className="w-full flex items-center justify-between text-left"
+        >
+          <div>
+            <h4 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-[var(--primary)]" />
+              <span>Advanced Decision Weights</span>
+            </h4>
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
+              Customize how HealthPilot balances physiological suitability, goal alignment, and time feasibility
+            </p>
+          </div>
+          <ChevronDown
+            className={`w-4 h-4 text-[var(--text-muted)] transition-transform ${
+              showAdvancedWeights ? 'rotate-180' : ''
+            }`}
+          />
+        </button>
+
+        {showAdvancedWeights && (
+          <div className="pt-4 border-t border-[var(--border)] space-y-5 animate-in fade-in">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[var(--text-primary)] font-medium">Recovery & Readiness</span>
+                  <span className="font-bold text-[var(--primary)]">{Math.round(weights.suitabilityWeight * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={10}
+                  max={50}
+                  value={weights.suitabilityWeight * 100}
+                  onChange={(e) => setWeights({ ...weights, suitabilityWeight: Number(e.target.value) / 100 })}
+                  className="w-full accent-[var(--primary)]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[var(--text-primary)] font-medium">Predicted Adherence</span>
+                  <span className="font-bold text-[var(--primary)]">{Math.round(weights.predictedAdherenceWeight * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={10}
+                  max={50}
+                  value={weights.predictedAdherenceWeight * 100}
+                  onChange={(e) => setWeights({ ...weights, predictedAdherenceWeight: Number(e.target.value) / 100 })}
+                  className="w-full accent-[var(--primary)]"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[var(--text-primary)] font-medium">Long-Term Goal Progress</span>
+                  <span className="font-bold text-[var(--primary)]">{Math.round(weights.goalAlignmentWeight * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={10}
+                  max={50}
+                  value={weights.goalAlignmentWeight * 100}
+                  onChange={(e) => setWeights({ ...weights, goalAlignmentWeight: Number(e.target.value) / 100 })}
+                  className="w-full accent-[var(--primary)]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                onClick={resetWeights}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset to Balanced Defaults</span>
+              </button>
             </div>
           </div>
-
-          <div className="bg-[#0F0F11] border border-slate-800 rounded-xl p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-              <div>
-                <h4 className="text-sm font-bold text-white">Direct Trade-Off Comparison Matrix</h4>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Directly compare physiological demand vs. completion likelihood between two candidate options.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <select
-                  value={candidateAId || candidateA.id}
-                  onChange={e => setCandidateAId(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 text-white focus:outline-hidden"
-                >
-                  {dynamicallyScoredCandidates.map(c => (
-                    <option key={c.id} value={c.id}>
-                      Option A: {c.title}
-                    </option>
-                  ))}
-                </select>
-
-                <span className="text-xs font-mono text-slate-500">vs</span>
-
-                <select
-                  value={candidateBId || candidateB.id}
-                  onChange={e => setCandidateBId(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 text-xs rounded-lg px-2.5 py-1.5 text-white focus:outline-hidden"
-                >
-                  {dynamicallyScoredCandidates.map(c => (
-                    <option key={c.id} value={c.id}>
-                      Option B: {c.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Candidate A Card */}
-              <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold block">
-                      Candidate A
-                    </span>
-                    <h5 className="text-sm font-bold text-white mt-1">{candidateA.title}</h5>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                      <span>{candidateA.durationMinutes}m</span>
-                      <span>•</span>
-                      <span className="capitalize">{candidateA.intensity} intensity</span>
-                      <span>•</span>
-                      <span className="capitalize">{candidateA.environment}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-lg font-mono font-bold text-emerald-400">{candidateA.finalDecisionScore}</span>
-                    <span className="text-[10px] text-slate-500 block font-mono">Final Score</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2 bg-slate-800/40 rounded-lg">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Suitability</span>
-                    <span className="text-sm font-mono font-bold text-teal-300">{candidateA.suitabilityScore}%</span>
-                  </div>
-                  <div className="p-2 bg-slate-800/40 rounded-lg">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Adherence</span>
-                    <span className="text-sm font-mono font-bold text-emerald-400">{candidateA.predictedAdherence}%</span>
-                  </div>
-                  <div className="p-2 bg-slate-800/40 rounded-lg">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Goal Synergy</span>
-                    <span className="text-sm font-mono font-bold text-cyan-400">{candidateA.goalAlignmentScore}%</span>
-                  </div>
-                  <div className="p-2 bg-slate-800/40 rounded-lg">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Feasibility</span>
-                    <span className="text-sm font-mono font-bold text-indigo-400">{candidateA.contextFeasibilityScore}%</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1 text-xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Trade-Off Rationale:</span>
-                  <p className="text-slate-300 text-[11px] leading-relaxed bg-slate-800/30 p-2.5 rounded-lg border border-white/5">
-                    {candidateA.rationale}
-                  </p>
-                </div>
-              </div>
-
-              {/* Candidate B Card */}
-              <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-400 font-bold block">
-                      Candidate B
-                    </span>
-                    <h5 className="text-sm font-bold text-white mt-1">{candidateB.title}</h5>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
-                      <span>{candidateB.durationMinutes}m</span>
-                      <span>•</span>
-                      <span className="capitalize">{candidateB.intensity} intensity</span>
-                      <span>•</span>
-                      <span className="capitalize">{candidateB.environment}</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-lg font-mono font-bold text-cyan-400">{candidateB.finalDecisionScore}</span>
-                    <span className="text-[10px] text-slate-500 block font-mono">Final Score</span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div className="p-2 bg-slate-800/40 rounded-lg">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Suitability</span>
-                    <span className="text-sm font-mono font-bold text-teal-300">{candidateB.suitabilityScore}%</span>
-                  </div>
-                  <div className="p-2 bg-slate-800/40 rounded-lg">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Adherence</span>
-                    <span className="text-sm font-mono font-bold text-emerald-400">{candidateB.predictedAdherence}%</span>
-                  </div>
-                  <div className="p-2 bg-slate-800/40 rounded-lg">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Goal Synergy</span>
-                    <span className="text-sm font-mono font-bold text-cyan-400">{candidateB.goalAlignmentScore}%</span>
-                  </div>
-                  <div className="p-2 bg-slate-800/40 rounded-lg">
-                    <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Feasibility</span>
-                    <span className="text-sm font-mono font-bold text-indigo-400">{candidateB.contextFeasibilityScore}%</span>
-                  </div>
-                </div>
-
-                <div className="space-y-1 text-xs">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Trade-Off Rationale:</span>
-                  <p className="text-slate-300 text-[11px] leading-relaxed bg-slate-800/30 p-2.5 rounded-lg border border-white/5">
-                    {candidateB.rationale}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

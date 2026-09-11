@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { HealthPilotProvider, useHealthPilot } from './context/HealthPilotContext.js';
+import { ThemeProvider } from './context/ThemeContext.js';
 import { Sidebar } from './components/layout/Sidebar.js';
 import { Header } from './components/layout/Header.js';
 import { AuthPage } from './components/auth/AuthPage.js';
@@ -28,13 +29,13 @@ const MainContent: React.FC = () => {
   // Initial authentication loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#070709] flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)] flex flex-col items-center justify-center p-4">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 animate-pulse shadow-lg shadow-emerald-500/5">
+          <div className="w-12 h-12 rounded-2xl bg-[var(--primary-soft)] border border-[var(--primary)]/30 flex items-center justify-center text-[var(--primary)] animate-pulse shadow-md">
             <Activity className="w-6 h-6" />
           </div>
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+          <div className="flex items-center gap-2 text-xs font-medium text-[var(--text-secondary)]">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--primary)]" />
             <span>Initializing HealthPilot AI...</span>
           </div>
         </div>
@@ -83,7 +84,7 @@ const MainContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0B] text-slate-200 flex">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)] flex transition-colors duration-200">
       {/* Sidebar Navigation */}
       <Sidebar mobileOpen={mobileOpen} setMobileOpen={setMobileOpen} />
 
@@ -108,8 +109,10 @@ const MainContent: React.FC = () => {
 
 export default function App() {
   return (
-    <HealthPilotProvider>
-      <MainContent />
-    </HealthPilotProvider>
+    <ThemeProvider>
+      <HealthPilotProvider>
+        <MainContent />
+      </HealthPilotProvider>
+    </ThemeProvider>
   );
 }
