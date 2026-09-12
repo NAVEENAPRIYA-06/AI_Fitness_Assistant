@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db/repository.js';
 import { decisionEngine, DecisionIntelligenceEngine } from './server/engine/decisionEngine.js';
@@ -1444,6 +1445,20 @@ async function startServer() {
       console.error('Error running evaluation tests:', err);
       res.status(500).json({ error: err.message });
     }
+  });
+
+  // Explicit static file serving for public directory and hero images
+  app.use(express.static(path.join(process.cwd(), 'public')));
+  app.get('/image.png', (req, res, next) => {
+    const publicImage = path.join(process.cwd(), 'public', 'image.png');
+    const rootImage = path.join(process.cwd(), 'image.png');
+    if (fs.existsSync(publicImage)) {
+      return res.sendFile(publicImage);
+    }
+    if (fs.existsSync(rootImage)) {
+      return res.sendFile(rootImage);
+    }
+    next();
   });
 
   // Vite middleware integration

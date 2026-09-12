@@ -219,58 +219,15 @@ export const AuthPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Clean, Simple & Premium Fitness / Wellness Visual */}
-            <div className="relative w-full h-28 sm:h-32 lg:h-34 rounded-2xl overflow-hidden border border-[var(--border)] bg-gradient-to-r from-[#FFF4EE] via-[#FFEBE1] to-[#FDDCD0] dark:from-[#241A19] dark:via-[#1E1514] dark:to-[#181110] shadow-xs">
-              <svg
-                viewBox="0 0 540 136"
-                className="w-full h-full object-cover"
-                preserveAspectRatio="xMidYMid meet"
-                aria-hidden="true"
-              >
-                <defs>
-                  <linearGradient id="skyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#FFF7F2" stopOpacity="0.9" />
-                    <stop offset="50%" stopColor="#FEE9DF" stopOpacity="0.8" />
-                    <stop offset="100%" stopColor="#FCD5C8" stopOpacity="0.7" />
-                  </linearGradient>
-                  <linearGradient id="warmSun" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#FF9B8E" stopOpacity="0.85" />
-                    <stop offset="100%" stopColor="#F26B5E" stopOpacity="0.2" />
-                  </linearGradient>
-                  <linearGradient id="trailGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%" stopColor="#E49A8F" stopOpacity="0.35" />
-                    <stop offset="100%" stopColor="#D97A6D" stopOpacity="0.55" />
-                  </linearGradient>
-                </defs>
-
-                {/* Ambient Warm Daylight Rising Sun */}
-                <circle cx="390" cy="50" r="40" fill="url(#warmSun)" />
-                <circle cx="390" cy="50" r="22" fill="#FFA396" fillOpacity="0.5" />
-                <circle cx="390" cy="50" r="11" fill="#FFF4F1" fillOpacity="0.85" />
-
-                {/* Soft Horizon Hills */}
-                <path d="M 0 100 Q 120 68, 260 90 T 540 94 L 540 136 L 0 136 Z" fill="#E8A99E" fillOpacity="0.3" />
-                <path d="M 0 110 Q 180 82, 360 105 T 540 102 L 540 136 L 0 136 Z" fill="#D98275" fillOpacity="0.35" />
-
-                {/* Outdoor Nature Trail Path */}
-                <path d="M 0 124 Q 240 114, 540 122 L 540 136 L 0 136 Z" fill="url(#trailGrad)" />
-
-                {/* Clean, Realistic Silhouette of Person in Natural Outdoor Morning Activity */}
-                <g transform="translate(195, 42)" fill="#D45B4E">
-                  {/* Head with natural contour */}
-                  <ellipse cx="20" cy="11" rx="4.5" ry="5.5" />
-                  {/* Natural hair profile */}
-                  <path d="M 17 10 Q 12 13, 11 17 Q 14 16, 17 14" />
-                  {/* Athletic posture */}
-                  <path d="M 18 17 C 18 21, 16 31, 18 43 L 23 43 C 24 31, 23 21, 22 17 Z" />
-                  {/* Natural arm motion in gentle morning stride */}
-                  <path d="M 18 21 Q 10 27, 12 34 L 15 33 Q 13 28, 20 23 Z" />
-                  <path d="M 21 21 Q 28 27, 27 34 L 24 34 Q 25 28, 19 23 Z" />
-                  {/* Grounded natural legs */}
-                  <path d="M 18 43 L 14 63 L 18 64 L 20 46 Z" />
-                  <path d="M 22 43 L 27 61 L 31 63 L 24 46 Z" />
-                </g>
-              </svg>
+            {/* Attached Fitness Hero Image - Hidden on mobile/small screens, prominently displayed on desktop/tablet */}
+            <div className="hidden sm:block relative w-full h-36 sm:h-44 lg:h-48 rounded-2xl overflow-hidden border border-[var(--border)] bg-[var(--surface-soft)] shadow-sm">
+              <img
+                src="/image.png"
+                alt="HealthPilot AI - Small Steps, Big Changes"
+                className="w-full h-full object-cover object-center"
+                referrerPolicy="no-referrer"
+                loading="eager"
+              />
             </div>
 
             {/* Three Compact Fitness Benefits */}

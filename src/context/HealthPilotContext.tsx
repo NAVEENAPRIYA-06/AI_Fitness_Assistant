@@ -280,9 +280,57 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
     }
   }, [authFetch, token]);
 
-  // Startup behavior: On initial open or browser reload, HealthPilot AI displays
-  // the Authentication Landing Page instead of automatically reopening previous modules.
-  // Data in MongoDB is fully preserved and loaded upon user sign-in.
+  // Session validation on startup:
+  // - If user is unauthenticated: remain unauthenticated, showing the Auth Landing Page as the public entry point.
+  // - If user is authenticated with a valid token: restore their authenticated session and load their data.
+  // - If token is expired or invalid: clear session and return to Auth Landing Page.
+  useEffect(() => {
+    let isMounted = true;
+    const restoreSession = async () => {
+      try {
+        const savedToken = typeof window !== 'undefined' ? localStorage.getItem('healthpilot_jwt_token') : null;
+        if (!savedToken) {
+          setIsLoading(false);
+          return;
+        }
+
+        setIsLoading(true);
+        const res = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${savedToken}` }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (isMounted) {
+            setToken(savedToken);
+            setCurrentUser(data.user);
+            await fetchInitialData(savedToken);
+          }
+        } else {
+          // Token expired or invalid
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('healthpilot_jwt_token');
+            localStorage.removeItem('healthpilot_user');
+          }
+          if (isMounted) {
+            setToken(null);
+            setCurrentUser(null);
+          }
+        }
+      } catch (err) {
+        console.error('Session restoration error:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    restoreSession();
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchInitialData]);
 
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
