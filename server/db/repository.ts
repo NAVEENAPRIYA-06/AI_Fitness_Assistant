@@ -28,6 +28,7 @@ import { adaptivePlanEngine } from '../engine/adaptivePlanEngine.js';
 import { getWeekDates, isPast, isToday } from '../../src/utils/dateUtils.js';
 import { connectMongoDB, isMongoDBConnected } from './mongoConnect.js';
 import { getMongoModels } from './models.js';
+import mongoose from 'mongoose';
 
 export interface UserAccount {
   id: string;
@@ -98,7 +99,13 @@ export class PersistentHealthPilotDB {
     this.initStore();
 
     // Connect to MongoDB if MONGODB_URI is set
-    connectMongoDB().catch(err => {
+    connectMongoDB().then(connected => {
+      if (connected) {
+        this.loadFromMongoDB().catch(err => {
+          console.warn('[DB] Initial MongoDB load failed:', err?.message);
+        });
+      }
+    }).catch(err => {
       console.warn('[DB] Background MongoDB connection check:', err?.message);
     });
   }
@@ -185,11 +192,13 @@ export class PersistentHealthPilotDB {
       }
       for (const [userId, user] of Object.entries(data.users)) {
         await models.User.findOneAndUpdate(
-          { _id: user.id },
+          { email: user.email.toLowerCase().trim() },
           {
-            email: user.email,
+            email: user.email.toLowerCase().trim(),
             passwordHash: user.passwordHash,
+            password: user.passwordHash,
             name: user.name,
+            fullName: user.name,
             role: user.role,
             timezone: user.timezone,
             onboardingComplete: user.onboardingComplete
@@ -199,6 +208,261 @@ export class PersistentHealthPilotDB {
       }
     } catch {
       // Non-blocking sync
+    }
+  }
+
+  /**
+   * Reconciles and loads existing MongoDB users, health profiles, workouts, waters, diets, and goals
+   */
+  public async loadFromMongoDB(): Promise<void> {
+    if (!isMongoDBConnected() || !mongoose.connection.db) {
+      return;
+    }
+
+    try {
+      const db = mongoose.connection.db;
+      console.log('[MongoDB] Synchronizing existing database records into HealthPilot store...');
+
+      // 1. Load users
+      const rawUsers = await db.collection('users').find({}).toArray();
+      let importedUsersCount = 0;
+
+      for (const u of rawUsers) {
+        const id = String(u._id);
+        const email = (u.email || '').toLowerCase().trim();
+        if (!email) continue;
+
+        const name = u.fullName || u.name || 'User';
+        const passwordHash = u.password || u.passwordHash || '';
+
+        // Match existing user by email
+        const existing = Object.values(this.users).find(item => item.email.toLowerCase() === email);
+        const targetId = existing ? existing.id : id;
+
+        if (!this.users[targetId]) {
+          this.users[targetId] = {
+            id: targetId,
+            email,
+            passwordHash,
+            name,
+            role: (u.role as any) || 'user',
+            timezone: u.timezone || 'UTC',
+            onboardingComplete: false,
+            createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : new Date().toISOString(),
+            updatedAt: u.updatedAt ? new Date(u.updatedAt).toISOString() : new Date().toISOString()
+          };
+          importedUsersCount++;
+        } else {
+          if (passwordHash && !this.users[targetId].passwordHash) {
+            this.users[targetId].passwordHash = passwordHash;
+          }
+          if (name && (!this.users[targetId].name || this.users[targetId].name === 'User')) {
+            this.users[targetId].name = name;
+          }
+        }
+      }
+
+      // 2. Load health profiles
+      const rawHps = await db.collection('healthprofiles').find({}).toArray();
+      for (const hp of rawHps) {
+        const uidStr = String(hp.user);
+        const matchedUser = this.users[uidStr] || Object.values(this.users).find(u => u.id === uidStr);
+        if (!matchedUser) continue;
+
+        matchedUser.onboardingComplete = true;
+
+        const age = Number(hp.age) || 25;
+        const heightCm = Number(hp.height) || 170;
+        const weightKg = Number(hp.weight) || 65;
+        const bmi = Number(hp.bmi) || +(weightKg / Math.pow(heightCm / 100, 2)).toFixed(1);
+
+        const activityLevelStr = (hp.activityLevel || '').toLowerCase();
+        const fitnessLevel: 'beginner' | 'intermediate' | 'advanced' | 'athlete' =
+          activityLevelStr.includes('very active') || activityLevelStr.includes('athlete')
+            ? 'advanced'
+            : activityLevelStr.includes('moderately') || activityLevelStr.includes('moderate')
+            ? 'intermediate'
+            : 'beginner';
+
+        const goalStr = hp.goal || 'Gain Muscle';
+
+        if (!this.userProfiles[matchedUser.id]) {
+          this.userProfiles[matchedUser.id] = {
+            id: matchedUser.id,
+            name: matchedUser.name,
+            age,
+            gender: hp.gender || 'Not specified',
+            heightCm,
+            weightKg,
+            bmi,
+            fitnessLevel,
+            healthConditions: hp.healthConditions || [],
+            fitnessGoals: [goalStr, 'Consistent Physical Readiness'],
+            nutritionGoals: [
+              goalStr.toLowerCase().includes('gain') ? 'Hypertrophy Protein Distribution (~1.8g/kg)' : 'Balanced Nutrition',
+              'Consistent Daily Hydration'
+            ],
+            activityPreferences: [hp.activityLevel || 'General Fitness', 'Strength Training', 'Cardio Intervals'],
+            preferredWorkoutTypes: ['Functional Strength', 'Cardio Intervals', 'Bodyweight HIIT'],
+            preferredEnvironment: 'flexible',
+            availableEquipment: ['Bodyweight', 'Dumbbells', 'Resistance Bands']
+          };
+        }
+      }
+
+      // Also check if any existing user has a UserProfile in mongo models
+      const models = getMongoModels();
+      const mongoUserProfiles = await models.UserProfile.find({}).lean().catch(() => []);
+      for (const mup of mongoUserProfiles as any[]) {
+        if (mup.userId && !this.userProfiles[mup.userId]) {
+          this.userProfiles[mup.userId] = {
+            id: mup.userId,
+            name: mup.name || 'User',
+            age: mup.age || 28,
+            gender: mup.gender || 'Not specified',
+            heightCm: mup.heightCm || 172,
+            weightKg: mup.weightKg || 68,
+            bmi: mup.bmi || 23.0,
+            fitnessLevel: mup.fitnessLevel || 'intermediate',
+            healthConditions: mup.healthConditions || [],
+            fitnessGoals: mup.fitnessGoals || ['General Health & Longevity'],
+            nutritionGoals: mup.nutritionGoals || ['Consistent Hydration'],
+            activityPreferences: mup.activityPreferences || ['Functional Fitness'],
+            preferredWorkoutTypes: mup.preferredWorkoutTypes || ['Strength', 'Cardio'],
+            preferredEnvironment: mup.preferredEnvironment || 'flexible',
+            availableEquipment: mup.availableEquipment || ['Bodyweight']
+          };
+          if (this.users[mup.userId]) {
+            this.users[mup.userId].onboardingComplete = true;
+          }
+        }
+      }
+
+      // 3. Load workouts, waters, diets, and goals
+      for (const u of Object.values(this.users)) {
+        if (u.id === 'user-001') continue; // Preserve Alex Vance benchmark participant
+
+        if (!this.dailyContextHistories[u.id] || this.dailyContextHistories[u.id].length === 0) {
+          let userObjId: any = null;
+          try {
+            userObjId = new mongoose.Types.ObjectId(u.id);
+          } catch {
+            // Not ObjectId format
+          }
+
+          const query = userObjId ? { $or: [{ user: userObjId }, { user: u.id }] } : { user: u.id };
+          const userWorkouts = await db.collection('workouts').find(query).toArray().catch(() => []);
+          const userWaters = await db.collection('waters').find(query).toArray().catch(() => []);
+          const userDiets = await db.collection('diets').find(query).toArray().catch(() => []);
+          const userGoals = await db.collection('dailygoals').find(query).toArray().catch(() => []);
+
+          const contexts: DailyContext[] = [];
+          const datesMap = new Map<string, { duration: number; waterMl: number; hr?: number; cal?: number }>();
+
+          for (const w of userWorkouts) {
+            const dStr = w.createdAt ? new Date(w.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+            const prev = datesMap.get(dStr) || { duration: 0, waterMl: 0 };
+            prev.duration += Number(w.duration) || 30;
+            if (w.heartRate) prev.hr = Number(w.heartRate);
+            if (w.caloriesBurned) prev.cal = (prev.cal || 0) + Number(w.caloriesBurned);
+            datesMap.set(dStr, prev);
+          }
+
+          for (const wat of userWaters) {
+            const dStr = wat.dateKey || (wat.createdAt ? new Date(wat.createdAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+            const prev = datesMap.get(dStr) || { duration: 0, waterMl: 0 };
+            prev.waterMl += Number(wat.totalIntakeMl) || 0;
+            datesMap.set(dStr, prev);
+          }
+
+          const todayStr = new Date().toISOString().split('T')[0];
+          if (!datesMap.has(todayStr)) {
+            datesMap.set(todayStr, { duration: 45, waterMl: 2200 });
+          }
+
+          let dayIndex = 0;
+          for (const [dateStr, info] of datesMap.entries()) {
+            const recScore = Math.min(95, Math.max(55, Math.round(75 + (info.waterMl > 2000 ? 5 : -5) + (info.duration > 30 ? 5 : 0))));
+            contexts.push({
+              id: `ctx-${u.id}-${dayIndex++}`,
+              userId: u.id,
+              date: dateStr,
+              sleepHours: 7.2,
+              sleepDuration: 7.2,
+              sleepQuality: 7,
+              energyLevel: 7,
+              energy: 7,
+              fatigueLevel: 4,
+              fatigue: 4,
+              sorenessLevel: 3,
+              soreness: 3,
+              recoveryScore: recScore,
+              recoveryStatus: recScore >= 75 ? 'good' : 'moderate',
+              stressLevel: 4,
+              stress: 4,
+              mood: 'good',
+              cognitiveLoad: 4,
+              availableMinutes: Math.max(30, info.duration || 45),
+              preferredTime: 'evening',
+              environment: 'home',
+              equipmentAvailable: ['Dumbbells', 'Bodyweight'],
+              hydrationLiters: +(info.waterMl / 1000).toFixed(2),
+              notes: userDiets.length > 0 ? `Diet Plan: ${userDiets[0].goal || 'Balanced'}` : 'Consistent baseline wellness logged.',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString()
+            });
+          }
+
+          this.dailyContextHistories[u.id] = contexts.sort((a, b) => a.date.localeCompare(b.date));
+
+          if (userGoals.length > 0 && (!this.goals[u.id] || this.goals[u.id].length === 0)) {
+            const dg = userGoals[0];
+            this.goals[u.id] = [
+              {
+                id: `goal-${u.id}-1`,
+                title: `Daily Workout Target (${dg.dailyWorkoutTarget || 1} session/day)`,
+                category: 'consistency',
+                targetDate: '2026-12-31',
+                currentProgress: 80,
+                status: 'on_track',
+                priority: 'primary',
+                conflictStatus: 'none',
+                strategyAdjustment: 'Maintain current cadence'
+              },
+              {
+                id: `goal-${u.id}-2`,
+                title: `Daily Calorie Target (${dg.dailyCalorieTarget || 400} kcal active burn)`,
+                category: 'metabolic',
+                targetDate: '2026-12-31',
+                currentProgress: 75,
+                status: 'on_track',
+                priority: 'secondary',
+                conflictStatus: 'none',
+                strategyAdjustment: 'Fuel appropriately pre-workout'
+              },
+              {
+                id: `goal-${u.id}-3`,
+                title: `Hydration Target (${((dg.dailyWaterTarget || 3000) / 1000).toFixed(1)}L / day)`,
+                category: 'sleep',
+                targetDate: '2026-12-31',
+                currentProgress: 85,
+                status: 'on_track',
+                priority: 'supporting',
+                conflictStatus: 'none',
+                strategyAdjustment: 'Distribute fluid intake across daylight hours'
+              }
+            ];
+          }
+
+          this.recalculateEvolvingState(u.id);
+          this.rebalanceAdaptivePlan(u.id);
+        }
+      }
+
+      console.log(`[MongoDB] Synchronization complete. Store users count: ${Object.keys(this.users).length}.`);
+      this.persist();
+    } catch (err: any) {
+      console.error('[MongoDB] Error during loadFromMongoDB:', err?.message || err);
     }
   }
 
@@ -282,43 +546,8 @@ export class PersistentHealthPilotDB {
 
     this.dailyContextHistories[id] = [initialCtx];
 
-    // Initialize goals
-    this.goals[id] = [
-      {
-        id: `goal-${id}-1`,
-        title: 'Daily Health Consistency Habit',
-        category: 'consistency',
-        currentProgress: 15,
-        targetDate: new Date(Date.now() + 86400000 * 30).toISOString().split('T')[0],
-        priority: 'primary',
-        status: 'on_track',
-        conflictStatus: 'none',
-        activeConflictFlag: false,
-        timeframe: '4 Weeks',
-        targetValue: '5 Sessions / Week',
-        currentValue: '1 Session Logged',
-        strategyAdjustment: 'Anchor workout at 8:00 AM after breakfast.',
-        milestones: [
-          { id: 'm1', title: 'Complete 3 consecutive days', completed: false },
-          { id: 'm2', title: 'Establish recovery day habit', completed: false }
-        ]
-      },
-      {
-        id: `goal-${id}-2`,
-        title: 'Aerobic Stamina & Energy Optimization',
-        category: 'endurance',
-        currentProgress: 20,
-        targetDate: new Date(Date.now() + 86400000 * 60).toISOString().split('T')[0],
-        priority: 'secondary',
-        status: 'on_track',
-        conflictStatus: 'none',
-        activeConflictFlag: false,
-        timeframe: '8 Weeks',
-        targetValue: 'Zone 2 35 Min Base',
-        currentValue: '20 Min Base',
-        strategyAdjustment: 'Prioritize low-intensity aerobic walks and cycling.'
-      }
-    ];
+    // Initialize goals (new users start with no goals until personalized during onboarding)
+    this.goals[id] = [];
 
     this.outcomes[id] = [];
     this.recommendationHistories[id] = [];
@@ -345,10 +574,107 @@ export class PersistentHealthPilotDB {
     return null;
   }
 
+  public async findUserByEmailAsync(email: string): Promise<UserAccount | null> {
+    const existing = this.findUserByEmail(email);
+    if (existing) return existing;
+
+    // If not found in memory, query directly from MongoDB if connected
+    if (isMongoDBConnected() && mongoose.connection.db) {
+      try {
+        const normalized = email.toLowerCase().trim();
+        const rawUser = await mongoose.connection.db.collection('users').findOne({
+          email: { $regex: new RegExp(`^${normalized}$`, 'i') }
+        });
+        if (rawUser) {
+          const id = String(rawUser._id);
+          const user: UserAccount = {
+            id,
+            email: (rawUser.email || '').toLowerCase().trim(),
+            passwordHash: rawUser.password || rawUser.passwordHash || '',
+            name: rawUser.fullName || rawUser.name || 'User',
+            role: (rawUser.role as any) || 'user',
+            timezone: rawUser.timezone || 'UTC',
+            onboardingComplete: false,
+            createdAt: rawUser.createdAt ? new Date(rawUser.createdAt).toISOString() : new Date().toISOString(),
+            updatedAt: rawUser.updatedAt ? new Date(rawUser.updatedAt).toISOString() : new Date().toISOString()
+          };
+          this.users[id] = user;
+
+          // Check if healthprofile exists
+          const hp = await mongoose.connection.db.collection('healthprofiles').findOne({ user: rawUser._id });
+          if (hp) {
+            user.onboardingComplete = true;
+            this.userProfiles[id] = {
+              id,
+              name: user.name,
+              age: Number(hp.age) || 25,
+              gender: hp.gender || 'Not specified',
+              heightCm: Number(hp.height) || 170,
+              weightKg: Number(hp.weight) || 65,
+              bmi: Number(hp.bmi) || +(Number(hp.weight) / Math.pow(Number(hp.height) / 100, 2)).toFixed(1),
+              fitnessLevel: (hp.activityLevel || '').toLowerCase().includes('very') ? 'advanced' : 'intermediate',
+              healthConditions: [],
+              fitnessGoals: [hp.goal || 'Gain Muscle'],
+              nutritionGoals: ['Adequate protein', 'Optimal hydration'],
+              activityPreferences: [hp.activityLevel || 'General Fitness'],
+              preferredWorkoutTypes: ['Strength', 'Functional Fitness'],
+              preferredEnvironment: 'flexible',
+              availableEquipment: ['Bodyweight', 'Dumbbells']
+            };
+          }
+
+          this.recalculateEvolvingState(id);
+          this.rebalanceAdaptivePlan(id);
+          this.persist();
+          return { ...user };
+        }
+      } catch (err: any) {
+        console.warn('[DB] Error querying user directly from MongoDB:', err?.message);
+      }
+    }
+
+    return null;
+  }
+
   public findUserById(id: string): UserAccount | null {
     if (this.users[id]) {
       return { ...this.users[id] };
     }
+    return null;
+  }
+
+  public async findUserByIdAsync(id: string): Promise<UserAccount | null> {
+    const existing = this.findUserById(id);
+    if (existing) return existing;
+
+    if (isMongoDBConnected() && mongoose.connection.db) {
+      try {
+        let query: any = { _id: id };
+        if (mongoose.Types.ObjectId.isValid(id)) {
+          query = { $or: [{ _id: new mongoose.Types.ObjectId(id) }, { _id: id }] };
+        }
+        const rawUser = await mongoose.connection.db.collection('users').findOne(query);
+        if (rawUser) {
+          const userId = String(rawUser._id);
+          const user: UserAccount = {
+            id: userId,
+            email: (rawUser.email || '').toLowerCase().trim(),
+            passwordHash: rawUser.password || rawUser.passwordHash || '',
+            name: rawUser.fullName || rawUser.name || 'User',
+            role: (rawUser.role as any) || 'user',
+            timezone: rawUser.timezone || 'UTC',
+            onboardingComplete: !!rawUser.onboardingComplete,
+            createdAt: rawUser.createdAt ? new Date(rawUser.createdAt).toISOString() : new Date().toISOString(),
+            updatedAt: rawUser.updatedAt ? new Date(rawUser.updatedAt).toISOString() : new Date().toISOString()
+          };
+          this.users[userId] = user;
+          return { ...user };
+        }
+      } catch (err: any) {
+        console.warn('[DB] Error querying user by ID from MongoDB:', err?.message);
+      }
+    }
+
     return null;
   }
 
@@ -415,6 +741,13 @@ export class PersistentHealthPilotDB {
     if (updates.name && this.users[userId]) {
       this.users[userId].name = updates.name;
       this.users[userId].updatedAt = new Date().toISOString();
+    }
+
+    if (updates.primaryGoal && this.goals[userId]) {
+      const primaryGoalItem = this.goals[userId].find(g => g.priority === 'primary');
+      if (primaryGoalItem) {
+        primaryGoalItem.title = updates.primaryGoal;
+      }
     }
 
     this.persist();

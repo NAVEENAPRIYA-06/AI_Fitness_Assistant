@@ -25,6 +25,9 @@ export const OnboardingModal: React.FC = () => {
         name: currentUser?.name || 'Athlete',
         age: Number(age) || 30,
         primaryGoal,
+        fitnessGoals: [primaryGoal],
+        preferredEnvironment,
+        targetWeeklyWorkouts: Math.max(2, Math.min(7, Math.round((Number(weeklyAvailability) || 35) / 7) || 4)),
         targetSleepDurationHours: Number(targetSleep) || 7.5,
         baselineRestingHeartRate: Number(restingHeartRate) || 55,
         equipmentAccess: preferredEnvironment === 'gym' 

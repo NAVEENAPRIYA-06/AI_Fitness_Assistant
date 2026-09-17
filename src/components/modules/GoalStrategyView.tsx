@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 
 export const GoalStrategyView: React.FC = () => {
-  const { goals, setActiveModule } = useHealthPilot();
+  const { goals, setActiveModule, setIsOnboardingModalOpen } = useHealthPilot();
 
   const safeGoals = Array.isArray(goals) ? goals : [];
   const activeConflictsCount = safeGoals.filter(g => g.activeConflictFlag).length;
@@ -50,15 +50,31 @@ export const GoalStrategyView: React.FC = () => {
       {/* ACTIVE GOALS LIST */}
       <div className="space-y-5">
         {safeGoals.length === 0 ? (
-          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-10 text-center space-y-3">
-            <Target className="w-10 h-10 text-[var(--text-muted)] mx-auto" />
-            <p className="text-sm font-semibold text-[var(--text-primary)]">No active fitness goals yet.</p>
-            <button
-              onClick={() => setActiveModule('today')}
-              className="px-5 py-2.5 rounded-2xl bg-[var(--primary)] text-white text-xs font-bold shadow-xs"
-            >
-              Return to Today's Dashboard
-            </button>
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-10 sm:p-14 text-center space-y-4 max-w-xl mx-auto shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-[var(--primary-soft)] text-[var(--primary)] flex items-center justify-center mx-auto">
+              <Target className="w-6 h-6" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-xl font-bold text-[var(--text-primary)]">Your goals start here</h3>
+              <p className="text-sm text-[var(--text-secondary)]">
+                Set your goals and HealthPilot will create a personalized strategy for you.
+              </p>
+            </div>
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                onClick={() => setIsOnboardingModalOpen(true)}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-2xl bg-[var(--primary)] hover:opacity-90 text-white text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Set My Goals</span>
+              </button>
+              <button
+                onClick={() => setActiveModule('today')}
+                className="w-full sm:w-auto px-5 py-2.5 rounded-2xl bg-[var(--surface-soft)] hover:bg-[var(--surface-soft)]/80 text-[var(--text-secondary)] border border-[var(--border)] text-xs font-medium transition-all cursor-pointer"
+              >
+                Return to Dashboard
+              </button>
+            </div>
           </div>
         ) : (
           safeGoals.map((goal) => {

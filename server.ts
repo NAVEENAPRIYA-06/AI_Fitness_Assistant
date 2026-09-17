@@ -23,10 +23,15 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Connect to persistent MongoDB storage if URI provided (non-blocking fallback to persistent file db)
-  connectMongoDB().catch(err => {
-    console.log('[Database] MongoDB background initialization check:', err.message);
-  });
+  // Connect to persistent MongoDB storage and sync existing collections if connected
+  try {
+    const isConnected = await connectMongoDB();
+    if (isConnected) {
+      await db.loadFromMongoDB();
+    }
+  } catch (err: any) {
+    console.log('[Database] MongoDB initialization check:', err.message);
+  }
 
   // Health check
   app.get('/api/health', (req, res) => {
@@ -57,7 +62,7 @@ async function startServer() {
         return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
       }
 
-      const existingUser = db.findUserByEmail(email);
+      const existingUser = await db.findUserByEmailAsync(email);
       if (existingUser) {
         return res.status(409).json({ error: 'An account with this email address already exists. Please log in.' });
       }
@@ -103,7 +108,7 @@ async function startServer() {
         return res.status(400).json({ error: 'Email and password are required.' });
       }
 
-      const user = db.findUserByEmail(email.trim().toLowerCase());
+      const user = await db.findUserByEmailAsync(email.trim().toLowerCase());
       if (!user) {
         return res.status(401).json({ error: 'Invalid email or password.' });
       }
@@ -138,10 +143,13 @@ async function startServer() {
   });
 
   // Current Authenticated User & Profile
-  app.get('/api/auth/me', requireAuth, (req: AuthenticatedRequest, res) => {
+  app.get('/api/auth/me', requireAuth, async (req: AuthenticatedRequest, res) => {
     try {
       const userId = req.userId!;
-      const user = db.findUserById(userId);
+      let user = db.findUserById(userId);
+      if (!user) {
+        user = await db.findUserByIdAsync(userId);
+      }
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -727,7 +735,7 @@ async function startServer() {
       const baseResult = await mlService.computeCounterfactual(baseline, simulated);
 
       // 3. Current (Baseline) Recommendation evaluation
-      let currentRec: any = db.getRecommendationHistory()[0];
+      let currentRec: any = db.getRecommendationHistory(userId)[0];
       if (!currentRec) {
         currentRec = await decisionEngine.generateTodayRecommendation(
           profile,

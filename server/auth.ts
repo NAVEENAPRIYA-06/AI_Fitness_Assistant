@@ -43,10 +43,19 @@ export async function hashPassword(password: string): Promise<string> {
 }
 
 /**
- * Compares plaintext password with hash
+ * Compares plaintext password with hash safely
  */
 export async function comparePassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
+  if (!password || !hash) return false;
+  try {
+    if (hash.startsWith('$2a$') || hash.startsWith('$2b$') || hash.startsWith('$2y$') || hash.startsWith('$2x$')) {
+      return await bcrypt.compare(password, hash);
+    }
+    // Backward-compatible verification for legacy unhashed password fields if present
+    return password === hash;
+  } catch {
+    return false;
+  }
 }
 
 /**

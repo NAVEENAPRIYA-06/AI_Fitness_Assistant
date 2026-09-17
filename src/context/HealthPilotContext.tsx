@@ -25,7 +25,6 @@ import {
   initialEvolvingState,
   initialRecommendation,
   initialBehaviorSummary,
-  initialGoals,
   initialAdaptivePlan,
   initialOutcomes,
   initialRecommendationHistory
@@ -113,7 +112,7 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [recommendationHistory, setRecommendationHistory] = useState<RecommendationHistoryItem[]>(initialRecommendationHistory);
   const [outcomes, setOutcomes] = useState<RecommendationOutcome[]>(initialOutcomes);
   const [behaviorSummary, setBehaviorSummary] = useState<BehaviorPatternSummary | null>(initialBehaviorSummary);
-  const [goals, setGoals] = useState<GoalStrategyItem[]>(initialGoals);
+  const [goals, setGoals] = useState<GoalStrategyItem[]>([]);
   const [adaptivePlan, setAdaptivePlan] = useState<AdaptivePlanDay[]>(initialAdaptivePlan);
   const [adaptivePlanPayload, setAdaptivePlanPayload] = useState<AdaptivePlanPayload | null>({
     days: initialAdaptivePlan,
@@ -218,7 +217,7 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setRecommendation(recRes && !recRes.error && recRes.title ? recRes : initialRecommendation);
       setOutcomes(Array.isArray(outRes) ? outRes : initialOutcomes);
       setBehaviorSummary(behRes && !behRes.error ? behRes : initialBehaviorSummary);
-      setGoals(Array.isArray(goalRes) ? goalRes : initialGoals);
+      setGoals(Array.isArray(goalRes) ? goalRes : []);
 
       const resolvedDays = Array.isArray(planPayloadRes?.days)
         ? planPayloadRes.days
@@ -265,7 +264,7 @@ export const HealthPilotProvider: React.FC<{ children: React.ReactNode }> = ({ c
       setContextHistory([]);
       setEvolvingState(initialEvolvingState);
       setRecommendation(initialRecommendation);
-      setGoals(initialGoals);
+      setGoals([]);
       setAdaptivePlan(initialAdaptivePlan);
       setAdaptivePlanPayload({
         days: initialAdaptivePlan,

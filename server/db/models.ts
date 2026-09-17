@@ -7,8 +7,10 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 // 1. User Account
 export interface IUser extends Document {
   email: string;
-  passwordHash: string;
-  name: string;
+  passwordHash?: string;
+  password?: string;
+  name?: string;
+  fullName?: string;
   role: 'research_participant' | 'user' | 'admin';
   timezone: string;
   onboardingComplete: boolean;
@@ -17,13 +19,16 @@ export interface IUser extends Document {
 }
 
 const UserSchema = new Schema<IUser>({
+  _id: { type: Schema.Types.Mixed },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  passwordHash: { type: String, required: true },
-  name: { type: String, required: true, trim: true },
-  role: { type: String, enum: ['research_participant', 'user', 'admin'], default: 'user' },
+  passwordHash: { type: String, required: false },
+  password: { type: String, required: false },
+  name: { type: String, required: false, trim: true },
+  fullName: { type: String, required: false, trim: true },
+  role: { type: String, default: 'user' },
   timezone: { type: String, default: 'UTC' },
   onboardingComplete: { type: Boolean, default: false }
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 
 // 2. User Profile
 export interface IUserProfile extends Document {
